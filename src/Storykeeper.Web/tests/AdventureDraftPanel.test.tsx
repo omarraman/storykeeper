@@ -82,10 +82,10 @@ describe('AdventureDraftPanel', () => {
       campaignId="campaign-1"
       campaignActive
       sessionActive={false}
+      sessionLengthMinutes={60}
       onActivated={onActivated}
     />)
 
-    fireEvent.change(screen.getByLabelText('Approximate session length'), { target: { value: '60' } })
     fireEvent.change(screen.getByLabelText(/Parent preferences/), {
       target: { value: 'Add a gentle puzzle.' },
     })
@@ -113,6 +113,7 @@ describe('AdventureDraftPanel', () => {
       campaignId="campaign-1"
       campaignActive
       sessionActive
+      sessionLengthMinutes={45}
       onActivated={async () => {}}
     />)
 

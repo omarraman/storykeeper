@@ -185,19 +185,20 @@ public sealed class CampaignContinuityTests
     public async Task MigrationPreservesLegacySupersededAndDiscardedFactStatuses()
     {
         await using var database = await TestDatabase.CreateAsync("20261004093617_ChildFriendlyRules");
-        var campaign = await new CampaignService(new CampaignRepository(database.Context))
-            .CreateAsync("Legacy World", null);
+        var campaignId = Guid.NewGuid();
+        await database.Context.Database.ExecuteSqlInterpolatedAsync(
+            $"INSERT INTO Campaigns (Id, Name, Description, Status, CreatedAtUtc, UpdatedAtUtc, ArchivedAtUtc) VALUES ({campaignId}, {"Legacy World"}, {null}, {0}, {DateTimeOffset.UtcNow}, {DateTimeOffset.UtcNow}, {null})");
         database.Context.CampaignFacts.AddRange(
             new CampaignFact
             {
-                CampaignId = campaign.Id,
+                CampaignId = campaignId,
                 Category = "clue",
                 Statement = "This clue was superseded.",
                 Status = (CampaignFactStatus)2
             },
             new CampaignFact
             {
-                CampaignId = campaign.Id,
+                CampaignId = campaignId,
                 Category = "clue",
                 Statement = "This clue was discarded.",
                 Status = (CampaignFactStatus)3

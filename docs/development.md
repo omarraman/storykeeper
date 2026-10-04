@@ -36,6 +36,13 @@ For Docker Compose, set `STORYKEEPER_AI_BASE_URL`, `STORYKEEPER_AI_MODEL`,
 the untracked `.env` file. Generation remains unavailable if the provider
 settings are blank; no key is required to run the rest of the application.
 
+Configure `Storykeeper__ParentPin` on the API server (or
+`STORYKEEPER_PARENT_PIN` in Docker Compose) to enable PIN-gated parent
+settings and live controls. Use a private value of 6-64 characters. Parent
+control writes fail closed when the setting is absent or too short. The PIN
+is sent only in the `X-Parent-Pin` request header and is never stored by the
+web app. Production deployments must serve the app over HTTPS.
+
 Docker Compose uses the named `storykeeper-data` volume mounted at `/data`,
 which keeps the database when the API container is recreated. Use
 `docker compose down -v` only when intentionally deleting that local data.

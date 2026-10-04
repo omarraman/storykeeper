@@ -2,9 +2,10 @@
 
 ## Parent review flow
 
-From an active campaign room, a parent chooses an approximate session length
-(30, 45, or 60 minutes) and may add preferences up to 500 characters. The
-server generates one episode and saves it as a campaign-scoped draft. A
+From an active campaign room, a parent may add preferences up to 500
+characters. The campaign's saved session pacing target (15-180 minutes)
+governs generation and overrides any browser-supplied duration. The server
+generates one episode and saves it as a campaign-scoped draft. A
 running session must first be summarized. Parents can preview, edit,
 regenerate, approve, activate, or discard a draft; editing and regeneration
 return it to pending review. Only an approved draft can be activated.
@@ -23,7 +24,8 @@ currently in-progress quest.
 - `GET /api/campaigns/{campaignId}/adventure-drafts` lists that campaign's
   saved drafts.
 - `POST /api/campaigns/{campaignId}/adventure-drafts` generates one draft from
-  `sessionLengthMinutes` and optional `parentPreferences`.
+  optional `parentPreferences`; the campaign's saved pacing target is
+  authoritative for `sessionLengthMinutes`.
 - `GET /api/adventure-drafts/{draftId}` loads one saved draft.
 - `POST /api/adventure-drafts/{draftId}/regenerate` replaces an unactivated
   draft with a new generated plan while retaining its requested length and
@@ -40,12 +42,13 @@ campaign theme and tone, bible and current situation, up to 30 active facts
 ordered by importance, the three most recent saved session summaries, existing
 quest titles, NPC names, and locations. Proposed or resolved facts, other
 campaigns, and browser-supplied story context are excluded. Parent preferences
-are untrusted input and cannot override child-safety rules.
+are untrusted input and cannot override child-safety rules. The server also
+supplies saved fright/combat preferences and excluded topics or creatures.
 
 Generated and edited content is strict typed JSON. The API bounds the
 session length and text, requires every plan component and a featured NPC used
-in a scene, limits scene/path/clue counts, and rejects unsafe or mandatory
-combat content. Active facts are included in the generation prompt to avoid
+in a scene, limits scene/path/clue counts, and rejects unsafe or
+parent-excluded content and mandatory combat. Active facts are included in the generation prompt to avoid
 contradictions; parent review is required before activation. Provider failures
 or invalid output do not replace an existing valid draft. The provider key
 remains server-side.

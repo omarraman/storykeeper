@@ -193,7 +193,7 @@ public static class AdventureDraftValidator
         }
     }
 
-    private static string GetText(AdventureDraftContent content)
+    public static string GetText(AdventureDraftContent content)
     {
         var values = new List<string?>
         {

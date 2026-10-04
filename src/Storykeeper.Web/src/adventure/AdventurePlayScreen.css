@@ -32,6 +32,16 @@
   font-size: clamp(1.8rem, 3vw, 2.5rem);
 }
 
+.adventure-paused {
+  margin: 0;
+  padding: 11px 15px;
+  border: 1px solid #e5d6b8;
+  border-radius: 12px;
+  color: #74572d;
+  background: #fff5df;
+  font-weight: 700;
+}
+
 .demo-badge,
 .demo-hero-label {
   justify-self: end;

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Storykeeper.Api.Data;
 
@@ -10,9 +11,11 @@ using Storykeeper.Api.Data;
 namespace Storykeeper.Api.Data.Migrations
 {
     [DbContext(typeof(StorykeeperDbContext))]
-    partial class StorykeeperDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261004113208_ParentControls")]
+    partial class ParentControls
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
@@ -68,7 +71,7 @@ namespace Storykeeper.Api.Data.Migrations
                         {
                             t.HasCheckConstraint("CK_AdventureDrafts_GenerationNumber", "GenerationNumber >= 1");
 
-                            t.HasCheckConstraint("CK_AdventureDrafts_SessionLength", "SessionLengthMinutes BETWEEN 15 AND 180");
+                            t.HasCheckConstraint("CK_AdventureDrafts_SessionLength", "SessionLengthMinutes IN (30, 45, 60)");
                         });
                 });
 
@@ -673,7 +676,7 @@ namespace Storykeeper.Api.Data.Migrations
 
                     b.ToTable("Quests", t =>
                         {
-                            t.HasCheckConstraint("CK_Quests_SessionLength", "SessionLengthMinutes IS NULL OR SessionLengthMinutes BETWEEN 15 AND 180");
+                            t.HasCheckConstraint("CK_Quests_SessionLength", "SessionLengthMinutes IS NULL OR SessionLengthMinutes IN (30, 45, 60)");
                         });
                 });
 

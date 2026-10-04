@@ -12,6 +12,20 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
         (left, right) => left!.SequenceEqual(right!),
         value => value!.Aggregate(0, (hash, item) => HashCode.Combine(hash, item.GetHashCode())),
         value => value!.ToList());
+    private static readonly ValueComparer<ParentSafetySettings> ParentSafetySettingsComparer = new(
+        (left, right) => left!.FearLevel == right!.FearLevel &&
+                         left.CombatMode == right.CombatMode &&
+                         left.MaxNarrationWords == right.MaxNarrationWords &&
+                         left.SessionLengthMinutes == right.SessionLengthMinutes &&
+                         left.ExcludedContent.SequenceEqual(right.ExcludedContent),
+        value => HashCode.Combine(
+            value!.FearLevel,
+            value.CombatMode,
+            value.MaxNarrationWords,
+            value.SessionLengthMinutes,
+            value.ExcludedContent.Aggregate(0, (hash, item) => HashCode.Combine(hash, item.GetHashCode()))),
+        value => CloneParentSafetySettings(value!));
+    private static readonly JsonSerializerOptions SafetySettingsJsonOptions = new(JsonSerializerDefaults.Web);
 
     public DbSet<Campaign> Campaigns => Set<Campaign>();
     public DbSet<CampaignBrief> CampaignBriefs => Set<CampaignBrief>();
@@ -54,6 +68,11 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
                 .HasConversion(values => JsonSerializer.Serialize(values, (JsonSerializerOptions?)null),
                     value => JsonSerializer.Deserialize<List<string>>(value, (JsonSerializerOptions?)null) ?? new List<string>())
                 .Metadata.SetValueComparer(StringListComparer);
+            entity.Property(brief => brief.SafetySettings)
+                .HasConversion(
+                    settings => JsonSerializer.Serialize(settings, SafetySettingsJsonOptions),
+                    value => JsonSerializer.Deserialize<ParentSafetySettings>(value, SafetySettingsJsonOptions) ?? ParentSafetySettings.Defaults)
+                .Metadata.SetValueComparer(ParentSafetySettingsComparer);
         });
 
         modelBuilder.Entity<CampaignDraft>(entity =>
@@ -78,7 +97,7 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
             entity.Property(draft => draft.ParentPreferences).HasMaxLength(500);
             entity.ToTable(table =>
             {
-                table.HasCheckConstraint("CK_AdventureDrafts_SessionLength", "SessionLengthMinutes IN (30, 45, 60)");
+                table.HasCheckConstraint("CK_AdventureDrafts_SessionLength", "SessionLengthMinutes BETWEEN 15 AND 180");
                 table.HasCheckConstraint("CK_AdventureDrafts_GenerationNumber", "GenerationNumber >= 1");
             });
             entity.HasOne<Campaign>()
@@ -115,6 +134,11 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
         {
             entity.Property(settings => settings.Theme).HasMaxLength(100).IsRequired();
             entity.Property(settings => settings.Tone).HasMaxLength(300).IsRequired();
+            entity.Property(settings => settings.SafetySettings)
+                .HasConversion(
+                    safetySettings => JsonSerializer.Serialize(safetySettings, SafetySettingsJsonOptions),
+                    value => JsonSerializer.Deserialize<ParentSafetySettings>(value, SafetySettingsJsonOptions) ?? ParentSafetySettings.Defaults)
+                .Metadata.SetValueComparer(ParentSafetySettingsComparer);
         }, configureCampaignRelationship: false);
         ConfigureCampaignEntity<CampaignBible>(modelBuilder, entity =>
         {
@@ -178,11 +202,12 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
             entity.Property(quest => quest.Description).HasMaxLength(2000).IsRequired();
             entity.Property(quest => quest.AdventurePlanJson).HasMaxLength(12000);
             entity.ToTable(table => table.HasCheckConstraint(
-                "CK_Quests_SessionLength", "SessionLengthMinutes IS NULL OR SessionLengthMinutes IN (30, 45, 60)"));
+                "CK_Quests_SessionLength", "SessionLengthMinutes IS NULL OR SessionLengthMinutes BETWEEN 15 AND 180"));
         }, campaignNavigation: campaign => campaign.Quests);
         ConfigureCampaignEntity<Session>(modelBuilder, entity =>
         {
             entity.Property(session => session.Summary).HasMaxLength(4000);
+            entity.Property(session => session.ParentInstruction).HasMaxLength(300);
             entity.HasIndex(session => new { session.CampaignId, session.SessionNumber }).IsUnique();
             entity.HasAlternateKey(session => new { session.CampaignId, session.Id });
         }, campaignNavigation: campaign => campaign.Sessions);
@@ -272,4 +297,13 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
         }
         configure(entity);
     }
+
+    private static ParentSafetySettings CloneParentSafetySettings(ParentSafetySettings value) => new()
+    {
+        FearLevel = value.FearLevel,
+        CombatMode = value.CombatMode,
+        ExcludedContent = value.ExcludedContent.ToList(),
+        MaxNarrationWords = value.MaxNarrationWords,
+        SessionLengthMinutes = value.SessionLengthMinutes
+    };
 }

@@ -31,6 +31,8 @@ Current implementation focus:
   tokens, and forward-progress outcomes.
 - Campaign-scoped continuity with parent-curated session summaries, reviewable
   facts, relevance-selected prompt context, and an edit audit trail.
+- PIN-gated parent safety settings and live story redirects, enforced by the
+  API across generation and narration.
 - Text-first, tablet-first play before optional voice interaction.
 
 ## Core principles
@@ -56,7 +58,7 @@ Current implementation focus:
 | [Campaign generation](docs/campaign-generation.md) | CampaignBrief wizard, validated generation, approval, activation, and bible versions | Available |
 | [Next playable adventures](docs/next-adventures.md) | Session-length preferences, continuity-aware episode plans, parent review, and quest activation | Available |
 | [AI Storykeeper](docs/ai-storykeeper.md) | Prompting, schemas, turn processing, validation, and relevance-selected continuity | Available |
-| [Safety and parent controls](docs/safety-and-parent-controls.md) | Safety defaults, settings, parent PIN, pacing, and overrides | Planned |
+| [Safety and parent controls](docs/safety-and-parent-controls.md) | Safety defaults, campaign settings, parent PIN, pacing, and live redirects | Available |
 | [ADR directory](docs/decisions/) | Long-lived architecture decisions and their rationale | Planned |
 
 ## Issue roadmap

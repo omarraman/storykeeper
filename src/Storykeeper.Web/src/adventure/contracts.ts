@@ -43,6 +43,16 @@ export interface QuestSummary {
 }
 
 export type AdventureArcType = 'standalone' | 'seasonArc'
+export type FearLevel = 'none' | 'low'
+export type CombatMode = 'avoid' | 'silly' | 'storyOnly'
+
+export interface ParentSafetySettings {
+  fearLevel: FearLevel
+  combatMode: CombatMode
+  excludedContent: string[]
+  maxNarrationWords: number
+  sessionLengthMinutes: number
+}
 
 export interface AdventureDraftContent {
   title: string
@@ -106,6 +116,7 @@ export interface AdventureCampaign {
   id: string
   name: string
   status: 'Active' | 'Completed' | 'Archived'
+  safetySettings?: ParentSafetySettings
   heroes: {
     id: string
     name: string
@@ -122,6 +133,7 @@ export interface AdventureCampaign {
     startedAtUtc: string
     endedAtUtc: string | null
     summary: string | null
+    isPaused?: boolean
   } | null
 }
 

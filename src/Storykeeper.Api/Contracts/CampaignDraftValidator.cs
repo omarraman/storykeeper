@@ -176,7 +176,7 @@ public static class CampaignDraftValidator
         }
     }
 
-    private static string GetText(CampaignDraftContent content)
+    public static string GetText(CampaignDraftContent content)
     {
         var values = new List<string?> { content.Title, content.Premise, content.CentralMystery };
         values.AddRange(content.WorldRules ?? []);

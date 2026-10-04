@@ -49,6 +49,7 @@ public sealed class CampaignBriefService(StorykeeperDbContext dbContext) : ICamp
         existing.Inclusions = brief.Inclusions;
         existing.Exclusions = brief.Exclusions;
         existing.StoryIdea = brief.StoryIdea;
+        existing.SafetySettings = brief.SafetySettings;
         existing.SafetyBoundaries = CampaignBriefDefaults.SafetyBoundaries.ToList();
         existing.UpdatedAtUtc = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);

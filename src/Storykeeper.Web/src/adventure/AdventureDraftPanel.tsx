@@ -6,6 +6,7 @@ interface AdventureDraftPanelProps {
   campaignId: string
   campaignActive: boolean
   sessionActive: boolean
+  sessionLengthMinutes: number
   onActivated: () => Promise<void>
 }
 
@@ -23,13 +24,13 @@ export function AdventureDraftPanel({
   campaignId,
   campaignActive,
   sessionActive,
+  sessionLengthMinutes,
   onActivated,
 }: AdventureDraftPanelProps) {
   const [drafts, setDrafts] = useState<AdventureDraft[]>([])
   const [selected, setSelected] = useState<AdventureDraft | null>(null)
   const [form, setForm] = useState<AdventureDraftContent | null>(null)
   const [editing, setEditing] = useState(false)
-  const [sessionLength, setSessionLength] = useState(45)
   const [preferences, setPreferences] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -64,7 +65,7 @@ export function AdventureDraftPanel({
         {
           method: 'POST',
           body: JSON.stringify({
-            sessionLengthMinutes: sessionLength,
+            sessionLengthMinutes,
             parentPreferences: preferences.trim() || null,
           }),
         },
@@ -202,13 +203,7 @@ export function AdventureDraftPanel({
       )}
       {campaignActive && !sessionActive && (
         <form className="adventure-generate-form" onSubmit={(event) => void generate(event)}>
-          <label>Approximate session length
-            <select value={sessionLength} onChange={(event) => setSessionLength(Number(event.target.value))} disabled={saving}>
-              <option value={30}>About 30 minutes</option>
-              <option value={45}>About 45 minutes</option>
-              <option value={60}>About 60 minutes</option>
-            </select>
-          </label>
+          <p className="adventure-builder-note">Session pacing: about {sessionLengthMinutes} minutes, set in parent controls.</p>
           <label>Parent preferences <span>(optional)</span>
             <textarea maxLength={500} rows={2} value={preferences}
               onChange={(event) => setPreferences(event.target.value)} disabled={saving}

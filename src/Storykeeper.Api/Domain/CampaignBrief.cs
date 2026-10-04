@@ -24,6 +24,7 @@ public sealed class CampaignBrief
     public List<string> Exclusions { get; set; } = [];
     public string? StoryIdea { get; set; }
     public List<string> SafetyBoundaries { get; set; } = CampaignBriefDefaults.SafetyBoundaries.ToList();
+    public ParentSafetySettings SafetySettings { get; set; } = ParentSafetySettings.Defaults;
     public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
     public ICollection<CampaignDraft> Drafts { get; set; } = new List<CampaignDraft>();

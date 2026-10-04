@@ -149,9 +149,12 @@ public sealed class GameRulesService(StorykeeperDbContext dbContext) : IGameRule
             .MaxAsync(item => (int?)item.SessionNumber, cancellationToken);
         if (campaign.Status != CampaignStatus.Active ||
             session.EndedAtUtc is not null ||
-            session.SessionNumber != latestSessionNumber)
+            session.SessionNumber != latestSessionNumber ||
+            session.IsPaused)
         {
-            throw new RuleConflictException("Checks can only be resolved in the current active session.");
+            throw new RuleConflictException(session.IsPaused
+                ? "A parent has paused this session. Resume it from parent controls before resolving checks."
+                : "Checks can only be resolved in the current active session.");
         }
 
         var normalizedStrength = strength?.Trim();

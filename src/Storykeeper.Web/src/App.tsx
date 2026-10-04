@@ -3,6 +3,7 @@ import { request } from './api/request'
 import { AdventureDraftPanel } from './adventure/AdventureDraftPanel'
 import { AdventurePlayScreen } from './adventure/AdventurePlayScreen'
 import { CampaignContinuityPanel } from './adventure/CampaignContinuityPanel'
+import { ParentControlsPanel, type ParentSafetySettings } from './adventure/ParentControlsPanel'
 import { adventureTurnClient } from './adventure/client'
 import type { AdventureCampaign, SessionStartResponse } from './adventure/contracts'
 import './App.css'
@@ -19,6 +20,7 @@ type CampaignBriefInput = {
   inclusions: string[]
   exclusions: string[]
   storyIdea: string | null
+  safetySettings: ParentSafetySettings
 }
 type CampaignBrief = CampaignBriefInput & {
   id: string
@@ -74,6 +76,13 @@ function newBrief(): CampaignBriefInput {
     inclusions: [],
     exclusions: [],
     storyIdea: '',
+    safetySettings: {
+      fearLevel: 'low',
+      combatMode: 'avoid',
+      excludedContent: [],
+      maxNarrationWords: 120,
+      sessionLengthMinutes: 45,
+    },
   }
 }
 
@@ -99,6 +108,7 @@ type Campaign = {
   theme: string
   tone: string
   lowFright: boolean
+  safetySettings: ParentSafetySettings
   bibleVersion: number
   worldDescription: string
   currentSituation: string | null
@@ -134,6 +144,7 @@ type Session = {
   startedAtUtc: string
   endedAtUtc: string | null
   summary: string | null
+  isPaused: boolean
 }
 
 const selectedCampaignKey = 'storykeeper.selectedCampaignId'
@@ -155,6 +166,7 @@ function App() {
   const [showWizard, setShowWizard] = useState(false)
   const [editingBriefId, setEditingBriefId] = useState<string | null>(null)
   const [briefForm, setBriefForm] = useState<CampaignBriefInput>(newBrief)
+  const [parentPin, setParentPin] = useState('')
   const [wizardStep, setWizardStep] = useState(0)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -256,7 +268,12 @@ function App() {
       inclusions: [...brief.inclusions],
       exclusions: [...brief.exclusions],
       storyIdea: brief.storyIdea,
+      safetySettings: {
+        ...(brief.safetySettings ?? newBrief().safetySettings),
+        excludedContent: [...(brief.safetySettings?.excludedContent ?? [])],
+      },
     } : newBrief())
+    setParentPin('')
     setWizardStep(0)
     setShowWizard(true)
   }
@@ -461,13 +478,23 @@ function App() {
         editingBriefId ? `/api/campaign-briefs/${encodeURIComponent(editingBriefId)}` : '/api/campaign-briefs',
         {
           method: editingBriefId ? 'PUT' : 'POST',
-          body: JSON.stringify({ ...briefForm, storyIdea: briefForm.storyIdea || null }),
+          headers: { 'X-Parent-Pin': parentPin },
+          body: JSON.stringify({
+            ...briefForm,
+            storyIdea: briefForm.storyIdea || null,
+            safetySettings: {
+              ...briefForm.safetySettings,
+              excludedContent: briefForm.exclusions,
+              sessionLengthMinutes: briefForm.sessionLengthMinutes,
+            },
+          }),
         },
       )
       setBriefs((current) => [saved, ...current.filter((brief) => brief.id !== saved.id)])
       setShowWizard(false)
       setEditingBriefId(null)
       setWizardStep(0)
+      setParentPin('')
       setError('')
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Could not save this campaign brief.')
@@ -489,6 +516,7 @@ function App() {
     setShowWizard(false)
     setEditingBriefId(null)
     setWizardStep(0)
+    setParentPin('')
     setError('')
   }
 
@@ -530,6 +558,7 @@ function App() {
             startedAtUtc: session.startedAtUtc,
             endedAtUtc: null,
             summary: null,
+            isPaused: false,
           },
           heroes: campaign.heroes.map((hero) => {
             const sessionHero = session.heroes.find((item) => item.heroId === hero.id)
@@ -559,7 +588,9 @@ function App() {
             const saved = updated.heroes.find((item) => item.id === hero.id)
             return saved ? { ...hero, hearts: saved.hearts, sparkleTokens: saved.sparkleTokens } : hero
           }),
-          latestSession: updated.latestSession,
+          latestSession: updated.latestSession
+            ? { ...updated.latestSession, isPaused: updated.latestSession.isPaused ?? current.latestSession?.isPaused ?? false }
+            : null,
         }
       : current)
   }
@@ -659,7 +690,14 @@ function App() {
                   </select>
                   <label htmlFor="brief-session-length">Session length</label>
                   <select id="brief-session-length" value={briefForm.sessionLengthMinutes}
-                    onChange={(event) => updateBrief('sessionLengthMinutes', Number(event.target.value))}>
+                    onChange={(event) => {
+                      const duration = Number(event.target.value)
+                      setBriefForm((current) => ({
+                        ...current,
+                        sessionLengthMinutes: duration,
+                        safetySettings: { ...current.safetySettings, sessionLengthMinutes: duration },
+                      }))
+                    }}>
                     <option value={30}>About 30 minutes</option>
                     <option value={45}>About 45 minutes</option>
                     <option value={60}>About an hour</option>
@@ -685,12 +723,42 @@ function App() {
                   </ul>
                 </div>
                 <div className="field-stack">
+                  <label htmlFor="brief-fear-level">Fright level</label>
+                  <select id="brief-fear-level" value={briefForm.safetySettings.fearLevel}
+                    onChange={(event) => setBriefForm((current) => ({
+                      ...current,
+                      safetySettings: { ...current.safetySettings, fearLevel: event.target.value as ParentSafetySettings['fearLevel'] },
+                    }))}>
+                    <option value="none">None</option>
+                    <option value="low">Low</option>
+                  </select>
+                  <label htmlFor="brief-combat-mode">Combat mode</label>
+                  <select id="brief-combat-mode" value={briefForm.safetySettings.combatMode}
+                    onChange={(event) => setBriefForm((current) => ({
+                      ...current,
+                      safetySettings: { ...current.safetySettings, combatMode: event.target.value as ParentSafetySettings['combatMode'] },
+                    }))}>
+                    <option value="avoid">Avoid</option>
+                    <option value="silly">Silly, non-graphic</option>
+                    <option value="storyOnly">Story-only, no tactics</option>
+                  </select>
+                  <label htmlFor="brief-narration-limit">Narration word limit</label>
+                  <input id="brief-narration-limit" type="number" min={40} max={150}
+                    value={briefForm.safetySettings.maxNarrationWords}
+                    onChange={(event) => setBriefForm((current) => ({
+                      ...current,
+                      safetySettings: { ...current.safetySettings, maxNarrationWords: Number(event.target.value) },
+                    }))} />
                   <label htmlFor="brief-inclusions">Things to include <span>(one per line, optional)</span></label>
                   <textarea id="brief-inclusions" maxLength={2000} rows={5} value={briefForm.inclusions.join('\n')}
                     onChange={(event) => updateBrief('inclusions', editLines(event.target.value))} placeholder={'Friendly dragons\nPuzzles and hidden gardens\nA helpful talking fox'} />
                   <label htmlFor="brief-exclusions">Things to avoid <span>(one per line, optional)</span></label>
                   <textarea id="brief-exclusions" maxLength={2000} rows={4} value={briefForm.exclusions.join('\n')}
                     onChange={(event) => updateBrief('exclusions', editLines(event.target.value))} placeholder={'Spiders\nStorms'} />
+                  <label htmlFor="brief-parent-pin">Parent PIN <span>(required to save settings)</span></label>
+                  <input id="brief-parent-pin" type="password" inputMode="numeric" autoComplete="current-password"
+                    value={parentPin} onChange={(event) => setParentPin(event.target.value)} required />
+                  <p className="field-hint">The API checks your PIN. Storykeeper does not save it in the browser.</p>
                 </div>
               </div>
             )}
@@ -962,11 +1030,17 @@ function App() {
               )}
             </section>
           </div>
+          <ParentControlsPanel
+            campaignId={selectedCampaign.id}
+            settings={selectedCampaign.safetySettings}
+            onSettingsSaved={(safetySettings) => setSelectedCampaign({ ...selectedCampaign, safetySettings })}
+          />
           <AdventureDraftPanel
             key={selectedCampaign.id}
             campaignId={selectedCampaign.id}
             campaignActive={selectedCampaign.status === 'Active'}
             sessionActive={selectedCampaign.latestSession?.endedAtUtc === null}
+            sessionLengthMinutes={selectedCampaign.safetySettings.sessionLengthMinutes}
             onActivated={async () => { await refreshCampaigns(selectedCampaign.id) }}
           />
           <CampaignContinuityPanel

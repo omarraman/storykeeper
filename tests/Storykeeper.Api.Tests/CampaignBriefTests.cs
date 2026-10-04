@@ -24,7 +24,15 @@ public sealed class CampaignBriefTests
             SessionLengthMinutes = 45,
             Inclusions = ["Friendly dragons"],
             Exclusions = ["Storms"],
-            StoryIdea = "A dragon is looking for a home."
+            StoryIdea = "A dragon is looking for a home.",
+            SafetySettings = new ParentSafetySettings
+            {
+                FearLevel = FearLevel.None,
+                CombatMode = CombatMode.Silly,
+                ExcludedContent = ["Spiders"],
+                MaxNarrationWords = 80,
+                SessionLengthMinutes = 60
+            }
         });
 
         var loaded = await service.GetAsync(created.Id);
@@ -34,6 +42,11 @@ public sealed class CampaignBriefTests
         Assert.Equal(["Friendly dragons"], loaded.Inclusions);
         Assert.Equal(["Storms"], loaded.Exclusions);
         Assert.Equal("A dragon is looking for a home.", loaded.StoryIdea);
+        Assert.Equal(FearLevel.None, loaded.SafetySettings.FearLevel);
+        Assert.Equal(CombatMode.Silly, loaded.SafetySettings.CombatMode);
+        Assert.Equal(["Spiders"], loaded.SafetySettings.ExcludedContent);
+        Assert.Equal(80, loaded.SafetySettings.MaxNarrationWords);
+        Assert.Equal(60, loaded.SafetySettings.SessionLengthMinutes);
         Assert.Equal(CampaignBriefDefaults.SafetyBoundaries, loaded.SafetyBoundaries);
 
         var updated = await service.UpdateAsync(created.Id, new CampaignBrief
@@ -45,12 +58,23 @@ public sealed class CampaignBriefTests
             SessionLengthMinutes = 30,
             Inclusions = ["Helpful foxes"],
             Exclusions = [],
+            SafetySettings = new ParentSafetySettings
+            {
+                FearLevel = FearLevel.Low,
+                CombatMode = CombatMode.StoryOnly,
+                ExcludedContent = ["Thunder"],
+                MaxNarrationWords = 100,
+                SessionLengthMinutes = 30
+            },
             SafetyBoundaries = ["User-provided boundary"]
         });
 
         Assert.NotNull(updated);
         Assert.Equal("The Starry Woods", updated.Title);
         Assert.Equal(CampaignBriefDefaults.SafetyBoundaries, updated.SafetyBoundaries);
+        Assert.Equal(FearLevel.Low, updated.SafetySettings.FearLevel);
+        Assert.Equal(CombatMode.StoryOnly, updated.SafetySettings.CombatMode);
+        Assert.Equal(["Thunder"], updated.SafetySettings.ExcludedContent);
         Assert.Single(await service.ListAsync());
         Assert.True(await service.DeleteAsync(created.Id));
         Assert.Empty(await service.ListAsync());
@@ -73,6 +97,9 @@ public sealed class CampaignBriefTests
         Assert.Contains("sessionLengthMinutes", errors.Keys);
         Assert.Contains("inclusions", errors.Keys);
         Assert.Contains("storyIdea", errors.Keys);
+        Assert.Contains("maxNarrationWords", CampaignBriefRequestValidator.Validate(new CampaignBriefRequest(
+            "A title", "Cozy fantasy", "Warm", 6, 45, null, null, null,
+            new ParentSafetySettings { MaxNarrationWords = 151 })).Keys);
         Assert.Empty(CampaignBriefRequestValidator.Validate(new CampaignBriefRequest(
             "A title",
             "Cozy fantasy",

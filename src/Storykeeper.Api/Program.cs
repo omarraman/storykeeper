@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
+using System.Threading.RateLimiting;
 using Storykeeper.Api.Data;
 using Storykeeper.Api.Contracts;
 using Storykeeper.Api.Domain;
@@ -10,6 +11,20 @@ using Microsoft.Extensions.Options;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddPolicy("parent-pin", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 12,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+});
 
 var connectionString = builder.Configuration.GetConnectionString("Storykeeper")
     ?? throw new InvalidOperationException("The Storykeeper database connection string is not configured.");
@@ -42,6 +57,7 @@ builder.Services.AddHttpClient<IStoryTurnGenerator, OpenAiCompatibleStoryTurnGen
 builder.Services.AddScoped<IStoryTurnService, StoryTurnService>();
 
 var app = builder.Build();
+app.UseRateLimiter();
 
 await using (var scope = app.Services.CreateAsyncScope())
 {
@@ -51,8 +67,129 @@ await using (var scope = app.Services.CreateAsyncScope())
 
 app.MapGet("/api/health", () => Results.Ok(new { status = "Healthy" }));
 
+app.MapPost("/api/parent-controls/verify", (HttpRequest httpRequest, IConfiguration configuration) =>
+{
+    var pinError = ValidateParentPin(httpRequest, configuration);
+    return pinError ?? Results.NoContent();
+}).RequireRateLimiting("parent-pin");
+
 app.MapGet("/api/campaigns", async (ICampaignService campaigns, CancellationToken cancellationToken) =>
     Results.Ok((await campaigns.ListAsync(cancellationToken)).Select(CampaignResponse.From)));
+
+app.MapPut("/api/campaigns/{campaignId:guid}/parent-controls", async (
+    Guid campaignId,
+    ParentControlsRequest? request,
+    HttpRequest httpRequest,
+    IConfiguration configuration,
+    StorykeeperDbContext dbContext,
+    CancellationToken cancellationToken) =>
+{
+    var pinError = ValidateParentPin(httpRequest, configuration);
+    if (pinError is not null) return pinError;
+
+    var errors = ParentControlsRequestValidator.Validate(request?.SafetySettings);
+    if (errors.Count > 0)
+    {
+        return Results.ValidationProblem(errors);
+    }
+
+    var campaign = await dbContext.Campaigns
+        .Include(item => item.Settings)
+        .SingleOrDefaultAsync(item => item.Id == campaignId, cancellationToken);
+    if (campaign is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (campaign.Status == CampaignStatus.Archived || campaign.Settings is null)
+    {
+        return Results.Problem(statusCode: 409, title: "Parent controls cannot be changed",
+            detail: "Controls can only be changed for a campaign that is not archived.");
+    }
+
+    campaign.Settings.SafetySettings = request!.SafetySettings! with
+    {
+        ExcludedContent = request.SafetySettings.ExcludedContent
+            .Select(value => value.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList()
+    };
+    campaign.UpdatedAtUtc = DateTimeOffset.UtcNow;
+    await dbContext.SaveChangesAsync(cancellationToken);
+    return Results.Ok(campaign.Settings.SafetySettings);
+}).RequireRateLimiting("parent-pin");
+
+app.MapPost("/api/campaigns/{campaignId:guid}/sessions/{sessionId:guid}/parent-actions", async (
+    Guid campaignId,
+    Guid sessionId,
+    ParentActionRequest? request,
+    HttpRequest httpRequest,
+    IConfiguration configuration,
+    StorykeeperDbContext dbContext,
+    CancellationToken cancellationToken) =>
+{
+    var pinError = ValidateParentPin(httpRequest, configuration);
+    if (pinError is not null) return pinError;
+
+    var errors = ParentControlsRequestValidator.Validate(request);
+    if (errors.Count > 0)
+    {
+        return Results.ValidationProblem(errors);
+    }
+
+    var session = await dbContext.Sessions.SingleOrDefaultAsync(
+        item => item.CampaignId == campaignId && item.Id == sessionId, cancellationToken);
+    if (session is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (session.EndedAtUtc is not null)
+    {
+        return Results.Problem(statusCode: 409, title: "Session has ended");
+    }
+
+    var campaignStatus = await dbContext.Campaigns
+        .Where(item => item.Id == campaignId)
+        .Select(item => item.Status)
+        .SingleOrDefaultAsync(cancellationToken);
+    var latestSessionId = await dbContext.Sessions
+        .Where(item => item.CampaignId == campaignId)
+        .OrderByDescending(item => item.SessionNumber)
+        .Select(item => (Guid?)item.Id)
+        .FirstOrDefaultAsync(cancellationToken);
+    if (campaignStatus != CampaignStatus.Active || latestSessionId != session.Id)
+    {
+        return Results.Problem(statusCode: 409, title: "Parent controls require the current active session");
+    }
+
+    session.ParentInstruction = request!.Action switch
+    {
+        "makeEasier" => "Make the next challenge easier and ensure the heroes make useful progress.",
+        "addClue" => "Offer a clear, useful clue now without requiring a roll.",
+        "skipScene" => "Skip the current scene and move directly to a fresh, player-led moment.",
+        "moveTowardEnding" => "Gently move the story toward a satisfying stopping point.",
+        "endSession" => "Bring the story to a gentle stopping point now, with no new cliffhanger.",
+        "pause" => null,
+        "resume" => null,
+        _ => throw new InvalidOperationException("Validated parent action was not recognized.")
+    };
+    if (request.Action is "pause" or "endSession")
+    {
+        session.IsPaused = true;
+    }
+    else if (request.Action == "resume")
+    {
+        session.IsPaused = false;
+    }
+
+    await dbContext.SaveChangesAsync(cancellationToken);
+    return Results.Ok(new
+    {
+        session.IsPaused,
+        endSessionRequested = request.Action == "endSession"
+    });
+}).RequireRateLimiting("parent-pin");
 
 app.MapGet("/api/campaigns/{campaignId:guid}/adventure-drafts", async (
     Guid campaignId,
@@ -360,9 +497,25 @@ app.MapPut("/api/campaigns/{campaignId:guid}/sessions/{sessionId:guid}/summary",
     Guid campaignId,
     Guid sessionId,
     SaveSessionSummaryRequest? request,
+    HttpRequest httpRequest,
+    IConfiguration configuration,
+    StorykeeperDbContext dbContext,
     ICampaignContinuityService continuity,
     CancellationToken cancellationToken) =>
 {
+    var session = await dbContext.Sessions.AsNoTracking().SingleOrDefaultAsync(
+        item => item.CampaignId == campaignId && item.Id == sessionId, cancellationToken);
+    if (session is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (session.EndedAtUtc is null)
+    {
+        var pinError = ValidateParentPin(httpRequest, configuration);
+        if (pinError is not null) return pinError;
+    }
+
     var errors = CampaignContinuityRequestValidator.Validate(request);
     if (errors.Count > 0)
     {
@@ -382,7 +535,7 @@ app.MapPut("/api/campaigns/{campaignId:guid}/sessions/{sessionId:guid}/summary",
     {
         return Results.Problem(statusCode: 409, title: "Session cannot be ended", detail: exception.Message);
     }
-});
+}).RequireRateLimiting("parent-pin");
 
 app.MapPost("/api/campaigns/{campaignId:guid}/sessions/{sessionId:guid}/heroes/{heroId:guid}/checks", async (
     Guid campaignId,
@@ -473,9 +626,14 @@ app.MapGet("/api/campaign-briefs", async (ICampaignBriefService briefs, Cancella
 
 app.MapPost("/api/campaign-briefs", async (
     CampaignBriefRequest? request,
+    HttpRequest httpRequest,
+    IConfiguration configuration,
     ICampaignBriefService briefs,
     CancellationToken cancellationToken) =>
 {
+    var pinError = ValidateParentPin(httpRequest, configuration);
+    if (pinError is not null) return pinError;
+
     var errors = CampaignBriefRequestValidator.Validate(request);
     if (errors.Count > 0)
     {
@@ -484,7 +642,7 @@ app.MapPost("/api/campaign-briefs", async (
 
     var brief = await briefs.CreateAsync(request!.ToDomain(), cancellationToken);
     return Results.Created($"/api/campaign-briefs/{brief.Id}", CampaignBriefResponse.From(brief));
-});
+}).RequireRateLimiting("parent-pin");
 
 app.MapGet("/api/campaign-briefs/{briefId:guid}", async (
     Guid briefId,
@@ -647,9 +805,14 @@ app.MapGet("/api/campaigns/{campaignId:guid}/bible-versions", async (
 app.MapPut("/api/campaign-briefs/{briefId:guid}", async (
     Guid briefId,
     CampaignBriefRequest? request,
+    HttpRequest httpRequest,
+    IConfiguration configuration,
     ICampaignBriefService briefs,
     CancellationToken cancellationToken) =>
 {
+    var pinError = ValidateParentPin(httpRequest, configuration);
+    if (pinError is not null) return pinError;
+
     var errors = CampaignBriefRequestValidator.Validate(request);
     if (errors.Count > 0)
     {
@@ -658,7 +821,7 @@ app.MapPut("/api/campaign-briefs/{briefId:guid}", async (
 
     var brief = await briefs.UpdateAsync(briefId, request!.ToDomain(), cancellationToken);
     return brief is null ? Results.NotFound() : Results.Ok(CampaignBriefResponse.From(brief));
-});
+}).RequireRateLimiting("parent-pin");
 
 app.MapDelete("/api/campaign-briefs/{briefId:guid}", async (
     Guid briefId,
@@ -736,6 +899,19 @@ static Dictionary<string, string[]> ValidateCampaignRequest(string? name, string
     }
 
     return errors;
+}
+
+static IResult? ValidateParentPin(HttpRequest request, IConfiguration configuration)
+{
+    if (!ParentPinAuthorization.IsConfigured(configuration))
+    {
+        return Results.Problem(statusCode: 503, title: "Parent controls are unavailable",
+            detail: "Configure the server-side Storykeeper:ParentPin setting first.");
+    }
+
+    return ParentPinAuthorization.IsAuthorized(request, configuration)
+        ? null
+        : Results.Unauthorized();
 }
 
 public sealed record CreateCampaignRequest(string? Name, string? Description);

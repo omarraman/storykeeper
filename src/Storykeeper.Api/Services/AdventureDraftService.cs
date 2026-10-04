@@ -35,13 +35,14 @@ public sealed class AdventureDraftService(
         var preferences = string.IsNullOrWhiteSpace(request.ParentPreferences)
             ? null
             : request.ParentPreferences.Trim();
+        var sessionLength = campaign.Settings?.SafetySettings.SessionLengthMinutes ?? request.SessionLengthMinutes;
         var content = await GenerateValidatedContentAsync(
-            campaign, request.SessionLengthMinutes, preferences, cancellationToken);
+            campaign, sessionLength, preferences, cancellationToken);
         var now = DateTimeOffset.UtcNow;
         var draft = new AdventureDraft
         {
             CampaignId = campaignId,
-            SessionLengthMinutes = request.SessionLengthMinutes,
+            SessionLengthMinutes = sessionLength,
             ParentPreferences = preferences,
             ContentJson = Serialize(content),
             CreatedAtUtc = now,
@@ -98,9 +99,11 @@ public sealed class AdventureDraftService(
             return new AdventureDraftOperationResult(AdventureDraftOperationStatus.Conflict, draft);
         }
 
+        var sessionLength = campaign.Settings?.SafetySettings.SessionLengthMinutes ?? draft.SessionLengthMinutes;
         var content = await GenerateValidatedContentAsync(
-            campaign, draft.SessionLengthMinutes, draft.ParentPreferences, cancellationToken);
+            campaign, sessionLength, draft.ParentPreferences, cancellationToken);
         draft.ContentJson = Serialize(content);
+        draft.SessionLengthMinutes = sessionLength;
         draft.GenerationNumber++;
         draft.Status = AdventureDraftStatus.PendingReview;
         draft.UpdatedAtUtc = DateTimeOffset.UtcNow;
@@ -125,8 +128,9 @@ public sealed class AdventureDraftService(
             return new AdventureDraftOperationResult(AdventureDraftOperationStatus.AlreadyActivated, draft);
         }
 
-        var npcNames = await LoadNpcNamesAsync(draft.CampaignId, cancellationToken);
-        var normalized = ValidateAndNormalize(content, npcNames);
+        var campaign = await LoadCampaignAsync(draft.CampaignId, cancellationToken);
+        var normalized = ValidateAndNormalize(content, campaign?.Npcs.Select(npc => npc.Name).ToArray(),
+            campaign?.Settings?.SafetySettings.ExcludedContent);
         draft.ContentJson = Serialize(normalized);
         draft.Status = AdventureDraftStatus.PendingReview;
         draft.UpdatedAtUtc = DateTimeOffset.UtcNow;
@@ -150,8 +154,9 @@ public sealed class AdventureDraftService(
             return new AdventureDraftOperationResult(AdventureDraftOperationStatus.AlreadyActivated, draft);
         }
 
-        var npcNames = await LoadNpcNamesAsync(draft.CampaignId, cancellationToken);
-        _ = ValidateAndNormalize(Deserialize(draft.ContentJson), npcNames);
+        var campaign = await LoadCampaignAsync(draft.CampaignId, cancellationToken);
+        _ = ValidateAndNormalize(Deserialize(draft.ContentJson), campaign?.Npcs.Select(npc => npc.Name).ToArray(),
+            campaign?.Settings?.SafetySettings.ExcludedContent);
         draft.Status = AdventureDraftStatus.Approved;
         draft.UpdatedAtUtc = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -192,7 +197,8 @@ public sealed class AdventureDraftService(
 
         var content = ValidateAndNormalize(
             Deserialize(draft.ContentJson),
-            campaign.Npcs.Select(npc => npc.Name).ToArray());
+            campaign.Npcs.Select(npc => npc.Name).ToArray(),
+            campaign.Settings?.SafetySettings.ExcludedContent);
         var now = DateTimeOffset.UtcNow;
         var quest = new Quest
         {
@@ -336,8 +342,10 @@ public sealed class AdventureDraftService(
             summaries,
             campaign.Quests.Select(quest => quest.Title).Order().ToArray(),
             campaign.Npcs.Select(npc => npc.Name).Order().ToArray(),
-            campaign.Locations.Select(location => location.Name).Order().ToArray()), cancellationToken);
-        return ValidateAndNormalize(content, campaign.Npcs.Select(npc => npc.Name).ToArray());
+            campaign.Locations.Select(location => location.Name).Order().ToArray(),
+            campaign.Settings?.SafetySettings ?? ParentSafetySettings.Defaults), cancellationToken);
+        return ValidateAndNormalize(content, campaign.Npcs.Select(npc => npc.Name).ToArray(),
+            campaign.Settings?.SafetySettings.ExcludedContent);
     }
 
     private async Task<string[]> LoadNpcNamesAsync(Guid campaignId, CancellationToken cancellationToken) =>
@@ -348,9 +356,15 @@ public sealed class AdventureDraftService(
 
     private static AdventureDraftContent ValidateAndNormalize(
         AdventureDraftContent? content,
-        IReadOnlyCollection<string> npcNames)
+        IReadOnlyCollection<string>? npcNames,
+        IReadOnlyCollection<string>? excludedContent = null)
     {
         var errors = AdventureDraftValidator.Validate(content, npcNames);
+        if (content is not null && SafetyContentFilter.ContainsExcludedContent(
+                AdventureDraftValidator.GetText(content), excludedContent))
+        {
+            errors["safetySettings.excludedContent"] = ["The adventure includes a topic or creature excluded by the parent."];
+        }
         if (errors.Count > 0)
         {
             throw new AdventureDraftRejectedException(errors);

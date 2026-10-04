@@ -171,7 +171,7 @@ public sealed class AdventureDraftTests
     public void ValidatorsRequirePlayableSafeStructureAndBoundedPreferences()
     {
         Assert.Contains("sessionLengthMinutes", AdventureDraftRequestValidator.Validate(
-            new AdventureDraftRequest(90, null)).Keys);
+            new AdventureDraftRequest(181, null)).Keys);
         Assert.Contains("parentPreferences", AdventureDraftRequestValidator.Validate(
             new AdventureDraftRequest(30, new string('x', 501))).Keys);
         Assert.Contains("scenes", AdventureDraftValidator.Validate(ValidContent() with { Scenes = [] }).Keys);

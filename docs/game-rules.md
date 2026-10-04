@@ -63,6 +63,10 @@ separated, or needs help, but can still act and cannot lose further hearts.
 Starting a new session is the only recovery rule in this version; mid-session
 healing is not implemented.
 
+A parent can pause an active session. The API rejects both narration actions
+and check resolution while paused; only a PIN-authorized parent resume or
+session wrap-up can continue the flow.
+
 ## API and persistence
 
 - `POST /api/campaigns/{campaignId}/sessions` starts the next session and

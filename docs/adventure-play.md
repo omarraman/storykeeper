@@ -35,8 +35,8 @@ summarized; activation starts its quest and completes the prior in-progress
 quest.
 
 At session end, a parent enters a compact factual recap in the play screen.
-Saving the recap ends the current session; a new session cannot silently close
-an unfinished one. The campaign room's continuity controls let a parent add
+Saving the recap with the parent PIN ends the current session; a new session
+cannot silently close an unfinished one. The campaign room's continuity controls let a parent add
 or correct facts, mark them active/resolved/superseded/discarded, revise
 summaries, and inspect the preserved correction history.
 

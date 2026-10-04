@@ -337,7 +337,7 @@ describe('AdventurePlayScreen', () => {
     }))
   })
 
-  it('ends a campaign session only after saving a factual parent summary', async () => {
+  it('ends a campaign session only after a parent PIN and factual summary', async () => {
     const continuityClient: CampaignContinuityClient = {
       load: vi.fn(),
       createFact: vi.fn(),
@@ -361,12 +361,14 @@ describe('AdventurePlayScreen', () => {
     fireEvent.change(screen.getByLabelText('Session summary'), {
       target: { value: 'Rowan found the folded map and promised to help Mira.' },
     })
+    fireEvent.change(screen.getByLabelText('Parent PIN'), { target: { value: '246810' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save summary and end adventure' }))
 
     await waitFor(() => expect(continuityClient.endSession).toHaveBeenCalledWith({
       campaignId: campaign.id,
       sessionId: 'session-1',
       summary: 'Rowan found the folded map and promised to help Mira.',
+      parentPin: '246810',
     }))
     expect(onBack).toHaveBeenCalledOnce()
   })

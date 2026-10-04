@@ -13,9 +13,9 @@ public static class AdventureDraftRequestValidator
             return errors;
         }
 
-        if (request.SessionLengthMinutes is not (30 or 45 or 60))
+        if (request.SessionLengthMinutes is < 15 or > 180)
         {
-            errors["sessionLengthMinutes"] = ["Choose an adventure length of 30, 45, or 60 minutes."];
+            errors["sessionLengthMinutes"] = ["Session length must be between 15 and 180 minutes."];
         }
 
         if (request.ParentPreferences?.Trim().Length > 500)

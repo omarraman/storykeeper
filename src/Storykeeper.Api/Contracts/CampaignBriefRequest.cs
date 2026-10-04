@@ -10,7 +10,8 @@ public sealed record CampaignBriefRequest(
     int SessionLengthMinutes,
     IReadOnlyList<string>? Inclusions,
     IReadOnlyList<string>? Exclusions,
-    string? StoryIdea)
+    string? StoryIdea,
+    ParentSafetySettings? SafetySettings = null)
 {
     public CampaignBrief ToDomain() => new()
     {
@@ -21,7 +22,16 @@ public sealed record CampaignBriefRequest(
         SessionLengthMinutes = SessionLengthMinutes,
         Inclusions = Normalize(Inclusions),
         Exclusions = Normalize(Exclusions),
-        StoryIdea = string.IsNullOrWhiteSpace(StoryIdea) ? null : StoryIdea.Trim()
+        StoryIdea = string.IsNullOrWhiteSpace(StoryIdea) ? null : StoryIdea.Trim(),
+        SafetySettings = (SafetySettings ?? ParentSafetySettings.Defaults) with
+        {
+            SessionLengthMinutes = SessionLengthMinutes,
+            ExcludedContent = (SafetySettings?.ExcludedContent ?? [])
+                .Concat(Exclusions ?? [])
+                .Select(value => value.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList()
+        }
     };
 
     private static List<string> Normalize(IReadOnlyList<string>? values) =>
@@ -57,9 +67,25 @@ public static class CampaignBriefRequestValidator
 
         ValidateList(errors, "inclusions", request.Inclusions);
         ValidateList(errors, "exclusions", request.Exclusions);
+        var combinedExclusions = (request.SafetySettings?.ExcludedContent ?? [])
+            .Concat(request.Exclusions ?? [])
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (combinedExclusions.Length > 20 ||
+            combinedExclusions.Any(value => string.IsNullOrWhiteSpace(value) || value.Trim().Length > 100))
+        {
+            errors["exclusions"] = ["Choose no more than 20 distinct excluded topics or creatures, each up to 100 characters."];
+        }
+
         if (request.StoryIdea?.Trim().Length > 2000)
         {
             errors["storyIdea"] = ["The story idea cannot exceed 2000 characters."];
+        }
+
+        foreach (var (field, messages) in ParentControlsRequestValidator.Validate(
+                     request.SafetySettings ?? ParentSafetySettings.Defaults))
+        {
+            errors[field] = messages;
         }
 
         return errors;

@@ -17,6 +17,9 @@ Inventory and completed quests are loaded from their saved campaign records.
 If the current quest came from a reviewed adventure draft, its stored opening,
 scenes, solution paths, clues, featured NPC, finale, reward, and pacing target
 are included so narration can follow the approved episode structure.
+Server-loaded parent safety settings and the current one-turn parent
+direction are included as well. Paused sessions are rejected before any
+provider request is made.
 The provider receives the player's action and saved story context as untrusted
 content under a stable child-safety narrator prompt.
 
@@ -25,11 +28,13 @@ either `roll_required` with a server-validated difficulty, optional listed
 hero strength, prompt, and risk flag, or `story_beat` with narration, optional
 speaker and NPC dialogue, up to four suggested choices, and current campaign
 state. Suggested choices do not constrain the player's next free-text action.
-Narration is prompted to be 60-120 words and rejected above 150 words.
+Narration follows the campaign's configured word limit (40-150 words), which
+the API enforces before returning a turn.
 
 The API validates response lengths, choice identifiers, NPC attribution,
 roll difficulty and strength, fact categories and importance, and child-safety
-content before applying anything. A roll request does not persist state.
+content, including campaign-excluded topics, before applying anything. A roll
+request does not persist state.
 Validated fact proposals are saved only as `Proposed` campaign facts, scoped
 to the current campaign and source session; duplicate statements are not
 re-added. A parent can create facts or promote, correct, resolve, supersede,

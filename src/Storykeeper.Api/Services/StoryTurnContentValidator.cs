@@ -14,7 +14,8 @@ public static class StoryTurnContentValidator
     public static Dictionary<string, string[]> Validate(
         StoryTurnContent? content,
         IReadOnlyCollection<Npc> campaignNpcs,
-        Hero? selectedHero)
+        Hero? selectedHero,
+        ParentSafetySettings? safetySettings = null)
     {
         var errors = new Dictionary<string, string[]>();
         if (content is null)
@@ -24,10 +25,11 @@ public static class StoryTurnContentValidator
         }
 
         ValidateText(errors, "narration", content.Narration, 1200);
+        var narrationLimit = safetySettings?.MaxNarrationWords ?? 120;
         if (content.Narration is not null &&
-            (content.Narration.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length > 150))
+            content.Narration.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length > narrationLimit)
         {
-            errors["narration"] = ["Narration must be no longer than 150 words."];
+            errors["narration"] = [$"Narration must be no longer than {narrationLimit} words."];
         }
 
         ValidateOptionalText(errors, "speaker", content.Speaker, 100);
@@ -121,6 +123,10 @@ public static class StoryTurnContentValidator
         if (!CampaignDraftValidator.IsSafeGeneratedText(generatedText))
         {
             errors["safety"] = ["The response includes content outside Storykeeper's child-safety boundaries."];
+        }
+        else if (SafetyContentFilter.ContainsExcludedContent(generatedText, safetySettings?.ExcludedContent))
+        {
+            errors["safetySettings.excludedContent"] = ["The response includes a topic or creature excluded by the parent."];
         }
 
         return errors;

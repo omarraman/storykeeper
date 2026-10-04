@@ -51,6 +51,11 @@ public sealed class StoryTurnService(
             throw new RuleConflictException("Story actions can only be sent to the current active session.");
         }
 
+        if (session.IsPaused)
+        {
+            throw new RuleConflictException("The story is paused by a parent. Resume it from parent controls to continue.");
+        }
+
         var heroes = campaign.Party?.Heroes.OrderBy(hero => hero.Name).ToArray() ?? [];
         Hero? selectedHero = null;
         if (request.HeroId is { } heroId)
@@ -131,10 +136,16 @@ public sealed class StoryTurnService(
                 theme = campaign.Settings?.Theme,
                 tone = campaign.Settings?.Tone,
                 lowFright = campaign.Settings?.LowFright ?? true,
+                parentSafetySettings = campaign.Settings?.SafetySettings ?? ParentSafetySettings.Defaults,
                 world = Limit(campaign.Bible?.WorldDescription, 1800),
                 currentSituation = Limit(campaign.Bible?.CurrentSituation, 1000)
             },
-            currentSession = new { session.SessionNumber, summary = Limit(session.Summary, 1200) },
+            currentSession = new
+            {
+                session.SessionNumber,
+                summary = Limit(session.Summary, 1200),
+                parentInstruction = session.ParentInstruction
+            },
             party = contextHeroes.Select(hero => new
             {
                 hero.Name,
@@ -210,7 +221,21 @@ public sealed class StoryTurnService(
         var generated = await generator.GenerateAsync(new StoryTurnGenerationInput(
             request.Action!.Trim(),
             JsonSerializer.Serialize(context, ContextJsonOptions)), cancellationToken);
-        var errors = StoryTurnContentValidator.Validate(generated, npcs, selectedHero);
+        if (session.ParentInstruction == "Make the next challenge easier and ensure the heroes make useful progress." &&
+            generated.RollRequest is { } easierRoll)
+        {
+            generated = generated with
+            {
+                RollRequest = easierRoll with
+                {
+                    Difficulty = CheckDifficulty.Easy.ToString(),
+                    Risky = false
+                }
+            };
+        }
+
+        var safetySettings = campaign.Settings?.SafetySettings ?? ParentSafetySettings.Defaults;
+        var errors = StoryTurnContentValidator.Validate(generated, npcs, selectedHero, safetySettings);
         if (errors.Count > 0)
         {
             throw new StoryTurnGenerationException(502,
@@ -226,6 +251,14 @@ public sealed class StoryTurnService(
 
         if (content.RollRequest is not null)
         {
+            if (session.ParentInstruction is not null)
+            {
+                await dbContext.Sessions
+                    .Where(item => item.CampaignId == campaignId && item.Id == session.Id)
+                    .ExecuteUpdateAsync(update => update.SetProperty(item => item.ParentInstruction, (string?)null),
+                        cancellationToken);
+            }
+
             return StoryTurnResponse.ForRoll(content.RollRequest);
         }
 
@@ -246,6 +279,14 @@ public sealed class StoryTurnService(
             dbContext.CampaignFacts.AddRange(newFacts);
             await dbContext.SaveChangesAsync(cancellationToken);
             facts = facts.Concat(newFacts).OrderByDescending(fact => fact.Importance).Take(20).ToArray();
+        }
+
+        if (session.ParentInstruction is not null)
+        {
+            await dbContext.Sessions
+                .Where(item => item.CampaignId == campaignId && item.Id == session.Id)
+                .ExecuteUpdateAsync(update => update.SetProperty(item => item.ParentInstruction, (string?)null),
+                    cancellationToken);
         }
 
         return StoryTurnResponse.ForStory(content, facts, currentQuest, heroes);

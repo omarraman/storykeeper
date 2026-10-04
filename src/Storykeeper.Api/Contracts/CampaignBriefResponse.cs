@@ -13,6 +13,7 @@ public sealed record CampaignBriefResponse(
     IReadOnlyList<string> Exclusions,
     string? StoryIdea,
     IReadOnlyList<string> SafetyBoundaries,
+    ParentSafetySettings SafetySettings,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc)
 {
@@ -27,6 +28,7 @@ public sealed record CampaignBriefResponse(
         brief.Exclusions,
         brief.StoryIdea,
         brief.SafetyBoundaries,
+        brief.SafetySettings,
         brief.CreatedAtUtc,
         brief.UpdatedAtUtc);
 }

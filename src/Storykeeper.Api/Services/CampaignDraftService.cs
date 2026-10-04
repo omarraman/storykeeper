@@ -77,7 +77,6 @@ public sealed class CampaignDraftService(
         CampaignDraftContent content,
         CancellationToken cancellationToken = default)
     {
-        var normalized = ValidateAndNormalize(content);
         var draft = await dbContext.CampaignDrafts
             .SingleOrDefaultAsync(item => item.Id == draftId, cancellationToken);
         if (draft is null)
@@ -90,6 +89,9 @@ public sealed class CampaignDraftService(
             return new CampaignDraftOperationResult(CampaignDraftOperationStatus.AlreadyActivated, draft);
         }
 
+        var brief = await dbContext.CampaignBriefs.AsNoTracking()
+            .SingleAsync(item => item.Id == draft.CampaignBriefId, cancellationToken);
+        var normalized = ValidateAndNormalize(content, GetExcludedContent(brief));
         draft.ContentJson = Serialize(normalized);
         draft.Status = CampaignDraftStatus.PendingReview;
         draft.UpdatedAtUtc = DateTimeOffset.UtcNow;
@@ -113,7 +115,9 @@ public sealed class CampaignDraftService(
             return new CampaignDraftOperationResult(CampaignDraftOperationStatus.AlreadyActivated, draft);
         }
 
-        _ = ValidateAndNormalize(Deserialize(draft.ContentJson));
+        var brief = await dbContext.CampaignBriefs.AsNoTracking()
+            .SingleAsync(item => item.Id == draft.CampaignBriefId, cancellationToken);
+        _ = ValidateAndNormalize(Deserialize(draft.ContentJson), GetExcludedContent(brief));
         draft.Status = CampaignDraftStatus.Approved;
         draft.UpdatedAtUtc = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -141,9 +145,9 @@ public sealed class CampaignDraftService(
             return new CampaignDraftActivationResult(CampaignDraftActivationStatus.ApprovalRequired);
         }
 
-        var content = ValidateAndNormalize(Deserialize(draft.ContentJson));
         var brief = await dbContext.CampaignBriefs.AsNoTracking()
             .SingleAsync(item => item.Id == draft.CampaignBriefId, cancellationToken);
+        var content = ValidateAndNormalize(Deserialize(draft.ContentJson), GetExcludedContent(brief));
         var now = DateTimeOffset.UtcNow;
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
@@ -157,7 +161,8 @@ public sealed class CampaignDraftService(
             {
                 Theme = brief.Genre,
                 Tone = brief.Tone,
-                LowFright = true
+                LowFright = true,
+                SafetySettings = brief.SafetySettings
             },
             Bible = new CampaignBible
             {
@@ -268,15 +273,30 @@ public sealed class CampaignDraftService(
         CancellationToken cancellationToken)
     {
         var generated = await generator.GenerateAsync(brief, cancellationToken);
-        return ValidateAndNormalize(generated);
+        return ValidateAndNormalize(generated, GetExcludedContent(brief));
     }
 
-    private static CampaignDraftContent ValidateAndNormalize(CampaignDraftContent? content)
+    private static string[] GetExcludedContent(CampaignBrief brief) =>
+        brief.Exclusions.Concat(brief.SafetySettings.ExcludedContent).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+
+    private static CampaignDraftContent ValidateAndNormalize(
+        CampaignDraftContent? content,
+        IReadOnlyCollection<string>? excludedContent = null)
     {
         var errors = CampaignDraftValidator.Validate(content);
         if (errors.Count > 0)
         {
             throw new CampaignDraftRejectedException(errors);
+        }
+
+        if (SafetyContentFilter.ContainsExcludedContent(
+                CampaignDraftValidator.GetText(content!),
+                excludedContent))
+        {
+            throw new CampaignDraftRejectedException(new Dictionary<string, string[]>
+            {
+                ["safetySettings.excludedContent"] = ["The draft includes a topic or creature excluded by the parent."]
+            });
         }
 
         return CampaignDraftValidator.Normalize(content!);

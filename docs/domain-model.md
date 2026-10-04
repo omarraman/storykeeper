@@ -14,7 +14,9 @@ campaign's party, hero, location, or session.
   archived, and completed campaigns may be archived. Completed campaigns
   remain resumable; archived campaigns preserve their saved data for
   read-only viewing.
-- `CampaignSettings` stores theme, tone, and the low-fright safety default.
+- `CampaignSettings` stores theme, tone, the low-fright safety default, and
+  the parent-selected fright/combat modes, excluded content, narration limit,
+  and session pacing target.
 - `CampaignBible` stores durable world description, current situation, and
   current version number.
 - `Party` groups the campaign's `Hero` records. Heroes track description,
@@ -26,14 +28,15 @@ campaign's party, hero, location, or session.
   reference a location in the same campaign.
 - `Quest` stores its title, description, and lifecycle status. Activated
   adventure quests also retain their validated structured episode plan and
-  selected 30-, 45-, or 60-minute target.
+  selected 15-180-minute target.
 - `AdventureDraft` stores one campaign-scoped episode plan, its parent pacing
   preferences, generation number, review status, and the quest created when
   activated. Drafts and their activated quest links cannot cross campaigns.
 - `Session` stores its sequence number, UTC start/end times, and optional
   factual summary. Starting a session resets each hero to 3 hearts and 1
-  sparkle token. A running session must be summarized before another session
-  can start.
+  sparkle token. It also stores a parent pause flag and one-turn narration
+  direction. A running session must be summarized before another session can
+  start.
 - `CheckResolution` records a server-calculated d20 result, its session and
   hero, the difficulty and bonuses, the outcome band, the forward-progress
   requirement, and before/after heart and sparkle-token counts. Composite
@@ -48,7 +51,8 @@ campaign's party, hero, location, or session.
 - `Relationship` stores a campaign-scoped relationship between typed hero or
   NPC IDs. The entity repository verifies both participants belong to that
   campaign before persisting the relationship.
-- `CampaignBrief` stores a parent-authored campaign idea before generation:
+- `CampaignBrief` stores a parent-authored campaign idea and safety settings
+  before generation:
   title, genre, tone, intended campaign and session lengths, optional
   inclusions and exclusions, and a free-text story idea. Briefs are saved
   independently of campaigns and have creation/update timestamps.
@@ -75,6 +79,11 @@ service.
 
 Campaign deletion is permanent and removes its campaign-owned records. The
 selector requires an explicit confirmation before requesting deletion.
+
+Parent safety settings are validated at the API boundary and copied from an
+approved campaign brief to its activated campaign. Generated adventure pacing
+uses the campaign's saved session-length target, and campaign settings never
+cross campaign boundaries.
 
 ## Current defaults and constraints
 

@@ -23,6 +23,9 @@ no gore or cruelty, no mature themes, no permanent character death, no
 mandatory tactical combat, and low-fright, age-appropriate content. These
 cannot be removed by browser input. The wizard displays them separately from
 the parent's optional exclusions.
+Campaign briefs also store parent-selected fright and combat modes, excluded
+topics or creatures, a narration word limit, and the session pacing target.
+Brief creation and updates require the server-configured parent PIN.
 
 Campaign length is bounded to 1-30 sessions and session length to 15-180
 minutes. The wizard currently offers common choices of 3, 6, or 10 sessions
@@ -42,7 +45,8 @@ only if it matches a location in the same draft. Text lengths are bounded.
 
 Every generated or parent-edited draft is checked on the server before it is
 returned or stored. All required safety declarations must be true, and a
-conservative content check rejects explicit unsafe terms. Invalid output is
+conservative content check rejects explicit unsafe terms and parent-excluded
+topics. The server prompt receives the safety profile. Invalid output is
 not persisted or shown for review; a failed regeneration leaves the previous
 valid draft intact. The parent can edit a valid draft, regenerate it, approve
 it, and then activate it. Editing or regenerating clears approval. Only an

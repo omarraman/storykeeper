@@ -13,6 +13,7 @@ public sealed record CampaignResponse(
     string Theme,
     string Tone,
     bool LowFright,
+    ParentSafetySettings SafetySettings,
     int BibleVersion,
     string WorldDescription,
     string? CurrentSituation,
@@ -47,6 +48,7 @@ public sealed record CampaignResponse(
             campaign.Settings?.Theme ?? string.Empty,
             campaign.Settings?.Tone ?? string.Empty,
             campaign.Settings?.LowFright ?? true,
+            campaign.Settings?.SafetySettings ?? ParentSafetySettings.Defaults,
             campaign.Bible?.Version ?? 1,
             campaign.Bible?.WorldDescription ?? string.Empty,
             campaign.Bible?.CurrentSituation,
@@ -109,8 +111,9 @@ public sealed record SessionResponse(
     int SessionNumber,
     DateTimeOffset StartedAtUtc,
     DateTimeOffset? EndedAtUtc,
-    string? Summary)
+    string? Summary,
+    bool IsPaused)
 {
     public static SessionResponse From(Session session) =>
-        new(session.Id, session.SessionNumber, session.StartedAtUtc, session.EndedAtUtc, session.Summary);
+        new(session.Id, session.SessionNumber, session.StartedAtUtc, session.EndedAtUtc, session.Summary, session.IsPaused);
 }

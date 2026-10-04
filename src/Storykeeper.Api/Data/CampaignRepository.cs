@@ -15,6 +15,7 @@ public sealed class CampaignRepository(StorykeeperDbContext dbContext) : ICampai
     public async Task<IReadOnlyList<Campaign>> ListAsync(CancellationToken cancellationToken = default)
     {
         var campaigns = await dbContext.Campaigns
+            .Include(campaign => campaign.Settings)
             .Include(campaign => campaign.Party)
                 .ThenInclude(party => party!.Heroes)
                     .ThenInclude(hero => hero.Inventory)

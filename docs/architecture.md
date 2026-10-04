@@ -58,6 +58,15 @@ approved plans activate transactionally as in-progress quests; each quest
 stores its structured plan and approximate session length. See
 [Next playable adventures](next-adventures.md) for the endpoints and lifecycle.
 
+Campaign safety settings are stored with the campaign (and with its source
+brief before activation). The API validates and supplies them to campaign
+generation, adventure generation, and live narration; excluded content and
+narration length are checked server-side before generated output is accepted.
+Parent writes and live redirects require the API-configured
+`Storykeeper__ParentPin`, sent in the request header and never persisted by the
+browser. A session pause is saved server-side and blocks both narration and
+check resolution.
+
 ## Storage configuration
 
 `ConnectionStrings:Storykeeper` selects the SQLite connection string and can

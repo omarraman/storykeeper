@@ -14,7 +14,8 @@ public sealed record AdventureGenerationInput(
     IReadOnlyList<string> RecentSessionSummaries,
     IReadOnlyList<string> ExistingQuestTitles,
     IReadOnlyList<string> NpcNames,
-    IReadOnlyList<string> LocationNames);
+    IReadOnlyList<string> LocationNames,
+    ParentSafetySettings? SafetySettings = null);
 
 public interface IAdventureDraftGenerator
 {

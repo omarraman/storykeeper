@@ -61,6 +61,7 @@ export interface CampaignContinuityClient {
     campaignId: string
     sessionId: string
     summary: string
+    parentPin: string
   }): Promise<AdventureCampaign>
 }
 
@@ -91,9 +92,10 @@ export const campaignContinuityClient: CampaignContinuityClient = {
       body: JSON.stringify({ summary }),
     })
   },
-  endSession: async ({ campaignId, sessionId, summary }) => {
+  endSession: async ({ campaignId, sessionId, summary, parentPin }) => {
     await request(`/api/campaigns/${encodeURIComponent(campaignId)}/sessions/${encodeURIComponent(sessionId)}/summary`, {
       method: 'PUT',
+      headers: { 'X-Parent-Pin': parentPin },
       body: JSON.stringify({ summary }),
     })
     return request<AdventureCampaign>(`/api/campaigns/${encodeURIComponent(campaignId)}`)

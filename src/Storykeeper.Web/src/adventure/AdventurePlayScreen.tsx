@@ -8,6 +8,7 @@ import type {
   StoryBeat,
 } from './contracts'
 import { campaignContinuityClient, type CampaignContinuityClient } from './continuityClient'
+import { ParentControlsPanel } from './ParentControlsPanel'
 import './AdventurePlayScreen.css'
 
 const difficultyTargets: Record<CheckDifficulty, number> = { Easy: 8, Tricky: 12, Heroic: 16 }
@@ -48,8 +49,11 @@ export function AdventurePlayScreen({
   const [strength, setStrength] = useState('')
   const [spendSparkleToken, setSpendSparkleToken] = useState(false)
   const [sessionSummary, setSessionSummary] = useState('')
+  const [sessionParentPin, setSessionParentPin] = useState('')
   const [savingSummary, setSavingSummary] = useState(false)
   const [summaryError, setSummaryError] = useState('')
+  const [showWrapUp, setShowWrapUp] = useState(false)
+  const [storyPaused, setStoryPaused] = useState(campaign.latestSession?.isPaused ?? false)
 
   const pendingRoll = turn.type === 'roll_required' ? turn.rollRequired : null
   const selectedHero = state.heroes.find((hero) => hero.id === selectedHeroId) ?? state.heroes[0]
@@ -70,6 +74,11 @@ export function AdventurePlayScreen({
   )
 
   const submitAction = async (action: string, choiceId: string | null): Promise<boolean> => {
+    if (storyPaused) {
+      setError('The story is paused by a parent.')
+      return false
+    }
+
     if (!selectedHero) return false
     const request = { action, choiceId, heroId: selectedHero.id }
     setLastAction(request)
@@ -109,6 +118,11 @@ export function AdventurePlayScreen({
 
   const submitRoll = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (storyPaused) {
+      setError('The story is paused by a parent.')
+      return
+    }
+
     if (!pendingRoll || !selectedHero) return
 
     if (!Number.isInteger(rollValue) || rollValue < 1 || rollValue > 20) {
@@ -188,6 +202,10 @@ export function AdventurePlayScreen({
       setSummaryError('Add a short factual recap before ending the adventure.')
       return
     }
+    if (!sessionParentPin.trim()) {
+      setSummaryError('Enter the parent PIN before ending the adventure.')
+      return
+    }
 
     setSavingSummary(true)
     setSummaryError('')
@@ -196,6 +214,7 @@ export function AdventurePlayScreen({
         campaignId: campaign.id,
         sessionId,
         summary,
+        parentPin: sessionParentPin,
       })
       onCampaignChange(updatedCampaign)
       onBack()
@@ -218,6 +237,29 @@ export function AdventurePlayScreen({
         </div>
         {state.mode === 'preview' && <span className="demo-badge">Preview · not saved</span>}
       </div>
+
+      {state.mode === 'campaign' && (
+        <ParentControlsPanel
+          campaignId={campaign.id}
+          settings={campaign.safetySettings ?? {
+            fearLevel: 'low',
+            combatMode: 'avoid',
+            excludedContent: [],
+            maxNarrationWords: 120,
+            sessionLengthMinutes: 45,
+          }}
+          sessionId={sessionId}
+          isPaused={storyPaused}
+          onSettingsSaved={(safetySettings) => onCampaignChange({ ...campaign, safetySettings })}
+          onPausedChange={setStoryPaused}
+          onEndSessionRequested={() => setShowWrapUp(true)}
+        />
+      )}
+      {storyPaused && (
+        <p className="adventure-paused" role="status">
+          The story is paused. A grown-up can resume it or write a recap to end this session.
+        </p>
+      )}
 
       <div className="adventure-layout">
         <main className="adventure-scene" aria-labelledby="scene-heading">
@@ -347,13 +389,13 @@ export function AdventurePlayScreen({
                 Spend 1 sparkle token
               </label>
             )}
-            <button className="button button-primary" type="submit" disabled={busy || !roll}>
+            <button className="button button-primary" type="submit" disabled={busy || storyPaused || !roll}>
               {busy ? 'Saving check…' : 'Resolve check'}
             </button>
             <button
               className="button button-secondary free-text-toggle"
               type="button"
-              disabled={busy}
+              disabled={busy || storyPaused}
               onClick={() => {
                 setTurn({ type: 'story_beat', storyBeat, state })
                 setShowFreeText(true)
@@ -373,7 +415,7 @@ export function AdventurePlayScreen({
                 <button
                   className="button button-secondary suggestion-button"
                   key={choice.id}
-                  disabled={busy || !selectedHero}
+                  disabled={busy || storyPaused || !selectedHero}
                   onClick={() => void submitAction(choice.text, choice.id)}
                 >
                   {choice.text}
@@ -383,7 +425,7 @@ export function AdventurePlayScreen({
                 className="button button-secondary free-text-toggle"
                 aria-expanded={showFreeText}
                 onClick={() => { setShowFreeText((visible) => !visible); setError('') }}
-                disabled={busy}
+                disabled={busy || storyPaused}
               >
                 We have another idea!
               </button>
@@ -397,10 +439,10 @@ export function AdventurePlayScreen({
                   maxLength={500}
                   value={actionText}
                   onChange={(event) => setActionText(event.target.value)}
-                  disabled={busy}
+                  disabled={busy || storyPaused}
                   autoFocus
                 />
-                <button className="button button-primary" type="submit" disabled={busy || !actionText.trim()}>
+                <button className="button button-primary" type="submit" disabled={busy || storyPaused || !actionText.trim()}>
                   {busy ? 'Thinking…' : 'Try our idea'}
                 </button>
               </form>
@@ -422,7 +464,7 @@ export function AdventurePlayScreen({
         {busy && <p className="adventure-loading" role="status">The story is catching up…</p>}
       </section>
 
-      <details className="adventure-wrap-up">
+      <details className="adventure-wrap-up" open={showWrapUp}>
         <summary>Parent: wrap up this adventure</summary>
         <form onSubmit={(event) => void finishSession(event)}>
           <p>Keep it brief and factual: note discoveries, rewards, important relationships, and promises still open. The full play-by-play is not saved as continuity.</p>
@@ -430,6 +472,10 @@ export function AdventurePlayScreen({
           <textarea id="session-summary" required maxLength={1200} rows={3}
             value={sessionSummary} onChange={(event) => setSessionSummary(event.target.value)}
             disabled={savingSummary} />
+          <label htmlFor="session-parent-pin">Parent PIN</label>
+          <input id="session-parent-pin" type="password" inputMode="numeric" autoComplete="current-password"
+            value={sessionParentPin} onChange={(event) => setSessionParentPin(event.target.value)}
+            disabled={savingSummary} required />
           {summaryError && <p className="adventure-error" role="alert">{summaryError}</p>}
           <button className="button button-primary" type="submit" disabled={savingSummary || !sessionSummary.trim()}>
             {savingSummary ? 'Saving summary…' : 'Save summary and end adventure'}
