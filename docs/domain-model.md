@@ -10,7 +10,10 @@ campaign's party, hero, location, or session.
 ## Entities
 
 - `Campaign` stores its name, description, lifecycle status, and UTC creation,
-  update, and archive timestamps.
+  update, and archive timestamps. Active campaigns may be completed or
+  archived, and completed campaigns may be archived. Completed campaigns
+  remain resumable; archived campaigns preserve their saved data for
+  read-only viewing.
 - `CampaignSettings` stores theme, tone, and the low-fright safety default.
 - `CampaignBible` stores durable world description and current situation.
 - `Party` groups the campaign's `Hero` records. Heroes track description,
@@ -37,6 +40,9 @@ superseded, or discarded and traced to its source session.
 Campaign archival preserves all campaign data. Archived campaigns remain
 loadable for save/resume history but cannot be updated through the campaign
 service.
+
+Campaign deletion is permanent and removes its campaign-owned records. The
+selector requires an explicit confirmation before requesting deletion.
 
 ## Current defaults and constraints
 

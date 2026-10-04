@@ -2,8 +2,9 @@ namespace Storykeeper.Api.Domain;
 
 public enum CampaignStatus
 {
-    Active,
-    Archived
+    Active = 0,
+    Archived = 1,
+    Completed = 2
 }
 
 public sealed class Campaign
@@ -18,4 +19,6 @@ public sealed class Campaign
     public CampaignSettings? Settings { get; set; }
     public CampaignBible? Bible { get; set; }
     public Party? Party { get; set; }
+    public ICollection<Quest> Quests { get; set; } = new List<Quest>();
+    public ICollection<Session> Sessions { get; set; } = new List<Session>();
 }

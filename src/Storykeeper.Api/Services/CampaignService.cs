@@ -29,6 +29,9 @@ public sealed class CampaignService(ICampaignRepository campaignRepository) : IC
     public Task<Campaign?> GetAsync(Guid campaignId, CancellationToken cancellationToken = default) =>
         campaignRepository.GetAsync(campaignId, cancellationToken);
 
+    public Task<IReadOnlyList<Campaign>> ListAsync(CancellationToken cancellationToken = default) =>
+        campaignRepository.ListAsync(cancellationToken);
+
     public Task<Campaign?> UpdateAsync(
         Guid campaignId,
         string name,
@@ -48,6 +51,12 @@ public sealed class CampaignService(ICampaignRepository campaignRepository) : IC
 
     public Task<bool> ArchiveAsync(Guid campaignId, CancellationToken cancellationToken = default) =>
         campaignRepository.ArchiveAsync(campaignId, DateTimeOffset.UtcNow, cancellationToken);
+
+    public Task<bool> CompleteAsync(Guid campaignId, CancellationToken cancellationToken = default) =>
+        campaignRepository.CompleteAsync(campaignId, DateTimeOffset.UtcNow, cancellationToken);
+
+    public Task<bool> DeleteAsync(Guid campaignId, CancellationToken cancellationToken = default) =>
+        campaignRepository.DeleteAsync(campaignId, cancellationToken);
 
     private static void ValidateDetails(string name, string? description)
     {

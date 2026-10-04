@@ -16,7 +16,8 @@ Early development.
 
 Current implementation focus:
 
-- Project foundation and local development environment.
+- Tablet-friendly campaign library with create, list, complete, archive,
+  delete, and saved campaign resume.
 - Reusable campaign/domain model with SQLite persistence and campaign isolation.
 - Text-first, tablet-first play before optional voice interaction.
 

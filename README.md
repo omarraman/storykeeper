@@ -32,6 +32,8 @@ npm run dev:web
 
 Open <http://localhost:5173>. The web app proxies `/api` requests to the API at
 <http://localhost:5080>; its status in the header confirms the health check.
+The campaign library can create and organize story worlds, and reopening a
+selected world restores its server-saved party, quests, and session summaries.
 
 ## Run with Docker Compose
 

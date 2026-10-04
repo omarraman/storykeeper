@@ -116,6 +116,69 @@ public sealed class CampaignPersistenceTests
     }
 
     [Fact]
+    public async Task CampaignsCanBeListedCompletedResumedAndDeletedIndependently()
+    {
+        Assert.Equal(1, (int)CampaignStatus.Archived);
+        await using var database = await TestDatabase.CreateAsync();
+        var campaignRepository = new CampaignRepository(database.Context);
+        var entityRepository = new CampaignEntityRepository(database.Context);
+        var service = new CampaignService(campaignRepository);
+        var first = await service.CreateAsync("First World", "A moonlit forest");
+        var second = await service.CreateAsync("Second World", "A friendly space station");
+        var hero = await entityRepository.AddAsync(first.Id, new Hero
+        {
+            CampaignId = first.Id,
+            PartyId = first.Party!.Id,
+            Name = "Pip",
+            Description = "A cheerful explorer",
+            Role = "Ranger"
+        });
+        await entityRepository.AddAsync(first.Id, new Quest
+        {
+            CampaignId = first.Id,
+            Title = "Find the lost star",
+            Description = "Follow the silver trail.",
+            Status = QuestStatus.InProgress
+        });
+        var session = await entityRepository.AddAsync(first.Id, new Session
+        {
+            CampaignId = first.Id,
+            SessionNumber = 1,
+            Summary = "Pip found a clue beneath the old oak."
+        });
+        await entityRepository.AddAsync(first.Id, new CampaignFact
+        {
+            CampaignId = first.Id,
+            SourceSessionId = session.Id,
+            Category = "Clue",
+            Statement = "The trail leads north.",
+            Status = CampaignFactStatus.Confirmed,
+            Importance = 3
+        });
+
+        var listed = await service.ListAsync();
+        var firstListed = Assert.Single(listed, campaign => campaign.Id == first.Id);
+        Assert.Single(firstListed.Party!.Heroes);
+        Assert.Single(firstListed.Quests);
+        Assert.Equal("Pip found a clue beneath the old oak.", Assert.Single(firstListed.Sessions).Summary);
+        Assert.Empty(Assert.Single(listed, campaign => campaign.Id == second.Id).Party!.Heroes);
+
+        Assert.True(await service.CompleteAsync(first.Id));
+        Assert.Null(await service.UpdateAsync(first.Id, "Changed", null));
+        var completed = await service.GetAsync(first.Id);
+        Assert.NotNull(completed);
+        Assert.Equal(CampaignStatus.Completed, completed.Status);
+        Assert.Equal("Pip", Assert.Single(completed.Party!.Heroes).Name);
+        Assert.True(await service.ArchiveAsync(first.Id));
+        Assert.Equal(CampaignStatus.Archived, (await service.GetAsync(first.Id))!.Status);
+
+        Assert.True(await service.DeleteAsync(first.Id));
+        Assert.Null(await service.GetAsync(first.Id));
+        Assert.Null(await entityRepository.GetAsync<Hero>(second.Id, hero.Id));
+        Assert.Equal("Second World", (await service.GetAsync(second.Id))!.Name);
+    }
+
+    [Fact]
     public async Task RelationshipParticipantsCannotCrossCampaignBoundaries()
     {
         await using var database = await TestDatabase.CreateAsync();

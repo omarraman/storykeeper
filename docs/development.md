@@ -14,6 +14,11 @@ is ignored by Git. Override it with `ConnectionStrings__Storykeeper`, for
 example `Data Source=C:\data\storykeeper.db` on Windows or
 `Data Source=/data/storykeeper.db` on Linux.
 
+The web app's campaign library uses the API to create, list, load, complete,
+archive, and delete story worlds. The selected campaign ID is stored in the
+browser so a refresh can reopen its saved campaign state; campaign data itself
+is persisted by the API in SQLite.
+
 Docker Compose uses the named `storykeeper-data` volume mounted at `/data`,
 which keeps the database when the API container is recreated. Use
 `docker compose down -v` only when intentionally deleting that local data.

@@ -100,13 +100,13 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
         {
             entity.Property(quest => quest.Title).HasMaxLength(160).IsRequired();
             entity.Property(quest => quest.Description).HasMaxLength(2000).IsRequired();
-        });
+        }, campaignNavigation: campaign => campaign.Quests);
         ConfigureCampaignEntity<Session>(modelBuilder, entity =>
         {
             entity.Property(session => session.Summary).HasMaxLength(4000);
             entity.HasIndex(session => new { session.CampaignId, session.SessionNumber }).IsUnique();
             entity.HasAlternateKey(session => new { session.CampaignId, session.Id });
-        });
+        }, campaignNavigation: campaign => campaign.Sessions);
         ConfigureCampaignEntity<CampaignFact>(modelBuilder, entity =>
         {
             entity.Property(fact => fact.Category).HasMaxLength(80).IsRequired();
@@ -137,7 +137,8 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
     private static void ConfigureCampaignEntity<TEntity>(
         ModelBuilder modelBuilder,
         Action<EntityTypeBuilder<TEntity>> configure,
-        bool configureCampaignRelationship = true)
+        bool configureCampaignRelationship = true,
+        System.Linq.Expressions.Expression<Func<Campaign, IEnumerable<TEntity>?>>? campaignNavigation = null)
         where TEntity : CampaignEntity
     {
         var entity = modelBuilder.Entity<TEntity>();
@@ -145,7 +146,7 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
         if (configureCampaignRelationship)
         {
             entity.HasOne<Campaign>()
-                .WithMany()
+                .WithMany(campaignNavigation)
                 .HasForeignKey(item => item.CampaignId)
                 .OnDelete(DeleteBehavior.Cascade);
         }
