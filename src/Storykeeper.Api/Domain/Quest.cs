@@ -13,4 +13,6 @@ public sealed class Quest : CampaignEntity
     public string Title { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public QuestStatus Status { get; set; } = QuestStatus.Available;
+    public int? SessionLengthMinutes { get; set; }
+    public string? AdventurePlanJson { get; set; }
 }

@@ -14,6 +14,9 @@ three latest ended-session summaries, unresolved promise/thread facts,
 relationships, rewards, NPCs, and locations to the AI provider. Proposed,
 resolved, superseded, and discarded facts are not used as active continuity.
 Inventory and completed quests are loaded from their saved campaign records.
+If the current quest came from a reviewed adventure draft, its stored opening,
+scenes, solution paths, clues, featured NPC, finale, reward, and pacing target
+are included so narration can follow the approved episode structure.
 The provider receives the player's action and saved story context as untrusted
 content under a stable child-safety narrator prompt.
 

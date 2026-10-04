@@ -41,7 +41,8 @@ public sealed record StoryTurnResponse(
                     hero.Strengths,
                     hero.Inventory.OrderBy(item => item.Name).Select(item =>
                         new InventoryItemStatusResponse(item.Name, item.Description, item.Quantity)).ToArray())).ToArray(),
-                quest is null ? null : new QuestStatusResponse(quest.Title, quest.Description),
+                quest is null ? null : new QuestStatusResponse(
+                    quest.Title, quest.Description, quest.SessionLengthMinutes),
                 facts.Select(fact => new ClueResponse(fact.Id, fact.Statement)).ToArray()),
             null);
 }
@@ -70,5 +71,5 @@ public sealed record HeroStatusResponse(
     IReadOnlyList<string> Strengths,
     IReadOnlyList<InventoryItemStatusResponse> Inventory);
 public sealed record InventoryItemStatusResponse(string Name, string Description, int Quantity);
-public sealed record QuestStatusResponse(string Title, string Description);
+public sealed record QuestStatusResponse(string Title, string Description, int? SessionLengthMinutes);
 public sealed record ClueResponse(Guid Id, string Text);

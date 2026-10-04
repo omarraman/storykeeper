@@ -131,7 +131,8 @@ h1 em {
 .tab:focus-visible,
 .dialog-close:focus-visible,
 input:focus-visible,
-textarea:focus-visible {
+textarea:focus-visible,
+select:focus-visible {
   outline: 3px solid #d5a76d;
   outline-offset: 3px;
 }
@@ -780,6 +781,190 @@ textarea:focus-visible {
 
 .continuity-create-form {
   margin-top: 14px;
+}
+
+.adventure-draft-panel {
+  display: grid;
+  gap: 18px;
+  margin-top: 22px;
+}
+
+.adventure-draft-heading h2 {
+  margin: 8px 0;
+}
+
+.adventure-draft-heading p:not(.card-kicker),
+.adventure-builder-note {
+  margin: 0;
+  color: #68746a;
+  line-height: 1.6;
+}
+
+.adventure-generate-form {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.6fr) minmax(260px, 1.4fr) auto;
+  align-items: end;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #e9e3d7;
+  border-radius: 14px;
+  background: #fffefa;
+}
+
+.adventure-generate-form label,
+.adventure-edit-form > label,
+.adventure-edit-form fieldset label {
+  display: grid;
+  gap: 6px;
+  color: #354e41;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.adventure-generate-form label span {
+  color: #768176;
+  font-weight: 400;
+}
+
+.adventure-generate-form input,
+.adventure-generate-form textarea,
+.adventure-generate-form select,
+.adventure-edit-form input,
+.adventure-edit-form textarea,
+.adventure-edit-form select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #d9ddd3;
+  border-radius: 9px;
+  color: #2b4539;
+  background: #fffefa;
+  font: inherit;
+}
+
+.adventure-generate-form textarea,
+.adventure-edit-form textarea {
+  resize: vertical;
+}
+
+.adventure-draft-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.adventure-draft-choice {
+  display: grid;
+  min-width: 210px;
+  gap: 5px;
+  padding: 12px 15px;
+  border: 1px solid #e4dfd3;
+  border-radius: 12px;
+  color: #344f41;
+  background: #fffefa;
+  text-align: left;
+  cursor: pointer;
+}
+
+.adventure-draft-choice.selected {
+  border-color: #92ad94;
+  background: #eff4ec;
+}
+
+.adventure-draft-choice span {
+  color: #7a8277;
+  font-size: 0.75rem;
+}
+
+.adventure-draft-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.adventure-draft-tools > span {
+  margin-right: auto;
+}
+
+.adventure-edit-form {
+  display: grid;
+  gap: 13px;
+  padding: 16px;
+  border: 1px solid #e9e3d7;
+  border-radius: 14px;
+  background: #fffefa;
+}
+
+.adventure-edit-form fieldset {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid #e9e3d7;
+  border-radius: 12px;
+}
+
+.adventure-edit-form legend {
+  padding: 0 6px;
+  color: #344f41;
+  font-weight: 700;
+}
+
+.adventure-edit-record {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #f7f5ee;
+}
+
+.adventure-preview {
+  padding: 19px;
+  border: 1px solid #e9e3d7;
+  border-radius: 14px;
+  background: #fffefa;
+  color: #68746a;
+  line-height: 1.65;
+}
+
+.adventure-preview h3 {
+  margin: 5px 0;
+  color: #2b4539;
+  font-family: var(--serif);
+  font-size: 1.7rem;
+  font-weight: 500;
+}
+
+.adventure-preview h4 {
+  margin: 17px 0 4px;
+  color: #344f41;
+}
+
+.adventure-preview p,
+.adventure-preview ol,
+.adventure-preview ul {
+  margin-top: 5px;
+  margin-bottom: 8px;
+}
+
+.adventure-preview li {
+  margin: 5px 0;
+}
+
+.adventure-draft-approval {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid #eee9df;
+}
+
+.adventure-draft-approval > span {
+  color: #52695b;
 }
 
 .quest-note {
@@ -1503,6 +1688,15 @@ textarea:focus-visible {
 }
 
 @media (max-width: 900px) {
+  .adventure-generate-form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .adventure-generate-form .button {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
   .draft-review-heading {
     align-items: flex-start;
     flex-direction: column;
@@ -1518,6 +1712,28 @@ textarea:focus-visible {
 }
 
 @media (max-width: 600px) {
+  .adventure-generate-form {
+    grid-template-columns: 1fr;
+  }
+
+  .adventure-generate-form .button {
+    width: 100%;
+  }
+
+  .adventure-draft-tools {
+    align-items: stretch;
+  }
+
+  .adventure-draft-tools .button {
+    flex: 1;
+    padding-inline: 12px;
+  }
+
+  .adventure-draft-approval {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .draft-review-tools {
     width: 100%;
   }

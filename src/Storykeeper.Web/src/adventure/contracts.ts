@@ -39,6 +39,37 @@ export interface HeroStatus {
 export interface QuestSummary {
   title: string
   description: string
+  sessionLengthMinutes?: number | null
+}
+
+export type AdventureArcType = 'standalone' | 'seasonArc'
+
+export interface AdventureDraftContent {
+  title: string
+  premise: string
+  arcType: AdventureArcType
+  arcConnection: string | null
+  opening: string
+  scenes: { title: string; description: string; npcName: string | null }[]
+  solutionPaths: string[]
+  clues: { title: string; description: string }[]
+  featuredNpc: { name: string; description: string; disposition: string }
+  finale: string
+  celebrationReward: string
+}
+
+export interface AdventureDraft {
+  id: string
+  campaignId: string
+  sessionLengthMinutes: number
+  parentPreferences: string | null
+  status: 'PendingReview' | 'Approved' | 'Activated'
+  generationNumber: number
+  content: AdventureDraftContent
+  activatedQuestId: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+  activatedAtUtc: string | null
 }
 
 export interface ClueSummary {

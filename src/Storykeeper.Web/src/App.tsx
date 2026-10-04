@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { request } from './api/request'
+import { AdventureDraftPanel } from './adventure/AdventureDraftPanel'
 import { AdventurePlayScreen } from './adventure/AdventurePlayScreen'
 import { CampaignContinuityPanel } from './adventure/CampaignContinuityPanel'
 import { adventureTurnClient } from './adventure/client'
@@ -120,7 +121,13 @@ type Hero = {
   inventory: { name: string; description: string; quantity: number }[]
 }
 
-type Quest = { id: string; title: string; description: string; status: string }
+type Quest = {
+  id: string
+  title: string
+  description: string
+  status: string
+  sessionLengthMinutes: number | null
+}
 type Session = {
   id: string
   sessionNumber: number
@@ -928,6 +935,9 @@ function App() {
                 <div className="quest-note">
                   <span className="card-kicker">CURRENT QUEST</span>
                   <strong>{selectedCampaign.currentQuest.title}</strong>
+                  {selectedCampaign.currentQuest.sessionLengthMinutes && (
+                    <span>About {selectedCampaign.currentQuest.sessionLengthMinutes} minutes</span>
+                  )}
                   <span>{selectedCampaign.currentQuest.description}</span>
                 </div>
               )}
@@ -952,6 +962,13 @@ function App() {
               )}
             </section>
           </div>
+          <AdventureDraftPanel
+            key={selectedCampaign.id}
+            campaignId={selectedCampaign.id}
+            campaignActive={selectedCampaign.status === 'Active'}
+            sessionActive={selectedCampaign.latestSession?.endedAtUtc === null}
+            onActivated={async () => { await refreshCampaigns(selectedCampaign.id) }}
+          />
           <CampaignContinuityPanel
             campaignId={selectedCampaign.id}
             sourceSessionId={selectedCampaign.latestSession?.id ?? null}

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Storykeeper.Api.Data;
 
@@ -10,9 +11,11 @@ using Storykeeper.Api.Data;
 namespace Storykeeper.Api.Data.Migrations
 {
     [DbContext(typeof(StorykeeperDbContext))]
-    partial class StorykeeperDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261004105842_NextPlayableAdventures")]
+    partial class NextPlayableAdventures
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
@@ -64,7 +67,7 @@ namespace Storykeeper.Api.Data.Migrations
 
                     b.HasIndex("CampaignId", "UpdatedAtUtc");
 
-                    b.ToTable("AdventureDrafts", null, t =>
+                    b.ToTable("AdventureDrafts", t =>
                         {
                             t.HasCheckConstraint("CK_AdventureDrafts_GenerationNumber", "GenerationNumber >= 1");
 
@@ -101,7 +104,7 @@ namespace Storykeeper.Api.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Campaigns", (string)null);
+                    b.ToTable("Campaigns");
                 });
 
             modelBuilder.Entity("Storykeeper.Api.Domain.CampaignBible", b =>
@@ -132,7 +135,7 @@ namespace Storykeeper.Api.Data.Migrations
                     b.HasIndex("CampaignId")
                         .IsUnique();
 
-                    b.ToTable("CampaignBibles", null, t =>
+                    b.ToTable("CampaignBibles", t =>
                         {
                             t.HasCheckConstraint("CK_CampaignBibles_Version", "Version >= 1");
                         });
@@ -175,7 +178,7 @@ namespace Storykeeper.Api.Data.Migrations
                     b.HasIndex("CampaignId", "Version")
                         .IsUnique();
 
-                    b.ToTable("CampaignBibleVersions", null, t =>
+                    b.ToTable("CampaignBibleVersions", t =>
                         {
                             t.HasCheckConstraint("CK_CampaignBibleVersions_Version", "Version >= 1");
                         });
@@ -232,7 +235,7 @@ namespace Storykeeper.Api.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("CampaignBriefs", (string)null);
+                    b.ToTable("CampaignBriefs");
                 });
 
             modelBuilder.Entity("Storykeeper.Api.Domain.CampaignContinuityRevision", b =>
@@ -276,7 +279,7 @@ namespace Storykeeper.Api.Data.Migrations
 
                     b.HasIndex("CampaignId", "RecordType", "RecordId");
 
-                    b.ToTable("CampaignContinuityRevisions", (string)null);
+                    b.ToTable("CampaignContinuityRevisions");
                 });
 
             modelBuilder.Entity("Storykeeper.Api.Domain.CampaignDraft", b =>
@@ -317,7 +320,7 @@ namespace Storykeeper.Api.Data.Migrations
 
                     b.HasIndex("CampaignId");
 
-                    b.ToTable("CampaignDrafts", (string)null);
+                    b.ToTable("CampaignDrafts");
                 });
 
             modelBuilder.Entity("Storykeeper.Api.Domain.CampaignFact", b =>
@@ -352,7 +355,7 @@ namespace Storykeeper.Api.Data.Migrations
 
                     b.HasIndex("CampaignId", "SourceSessionId");
 
-                    b.ToTable("CampaignFacts", null, t =>
+                    b.ToTable("CampaignFacts", t =>
                         {
                             t.HasCheckConstraint("CK_CampaignFacts_Importance", "Importance BETWEEN 1 AND 5");
                         });
@@ -385,7 +388,7 @@ namespace Storykeeper.Api.Data.Migrations
                     b.HasIndex("CampaignId")
                         .IsUnique();
 
-                    b.ToTable("CampaignSettings", (string)null);
+                    b.ToTable("CampaignSettings");
                 });
 
             modelBuilder.Entity("Storykeeper.Api.Domain.CheckResolution", b =>
@@ -464,7 +467,7 @@ namespace Storykeeper.Api.Data.Migrations
 
                     b.HasIndex("CampaignId", "SessionId");
 
-                    b.ToTable("CheckResolutions", null, t =>
+                    b.ToTable("CheckResolutions", t =>
                         {
                             t.HasCheckConstraint("CK_CheckResolutions_Roll", "Roll BETWEEN 1 AND 20");
 
@@ -515,7 +518,7 @@ namespace Storykeeper.Api.Data.Migrations
 
                     b.HasIndex("CampaignId", "PartyId");
 
-                    b.ToTable("Heroes", (string)null);
+                    b.ToTable("Heroes");
                 });
 
             modelBuilder.Entity("Storykeeper.Api.Domain.InventoryItem", b =>
@@ -547,7 +550,7 @@ namespace Storykeeper.Api.Data.Migrations
 
                     b.HasIndex("CampaignId", "HeroId");
 
-                    b.ToTable("InventoryItems", (string)null);
+                    b.ToTable("InventoryItems");
                 });
 
             modelBuilder.Entity("Storykeeper.Api.Domain.Location", b =>
@@ -571,7 +574,7 @@ namespace Storykeeper.Api.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Locations", (string)null);
+                    b.ToTable("Locations");
                 });
 
             modelBuilder.Entity("Storykeeper.Api.Domain.Npc", b =>
@@ -605,7 +608,7 @@ namespace Storykeeper.Api.Data.Migrations
 
                     b.HasIndex("CampaignId", "LocationId");
 
-                    b.ToTable("Npcs", (string)null);
+                    b.ToTable("Npcs");
                 });
 
             modelBuilder.Entity("Storykeeper.Api.Domain.Party", b =>
@@ -627,7 +630,7 @@ namespace Storykeeper.Api.Data.Migrations
                     b.HasIndex("CampaignId")
                         .IsUnique();
 
-                    b.ToTable("Parties", (string)null);
+                    b.ToTable("Parties");
                 });
 
             modelBuilder.Entity("Storykeeper.Api.Domain.Quest", b =>
@@ -663,7 +666,7 @@ namespace Storykeeper.Api.Data.Migrations
 
                     b.HasIndex("CampaignId");
 
-                    b.ToTable("Quests", null, t =>
+                    b.ToTable("Quests", t =>
                         {
                             t.HasCheckConstraint("CK_Quests_SessionLength", "SessionLengthMinutes IS NULL OR SessionLengthMinutes IN (30, 45, 60)");
                         });
@@ -699,7 +702,7 @@ namespace Storykeeper.Api.Data.Migrations
 
                     b.HasIndex("CampaignId");
 
-                    b.ToTable("Relationships", (string)null);
+                    b.ToTable("Relationships");
                 });
 
             modelBuilder.Entity("Storykeeper.Api.Domain.Reward", b =>
@@ -731,7 +734,7 @@ namespace Storykeeper.Api.Data.Migrations
 
                     b.HasIndex("CampaignId", "HeroId");
 
-                    b.ToTable("Rewards", (string)null);
+                    b.ToTable("Rewards");
                 });
 
             modelBuilder.Entity("Storykeeper.Api.Domain.Session", b =>
@@ -761,7 +764,7 @@ namespace Storykeeper.Api.Data.Migrations
                     b.HasIndex("CampaignId", "SessionNumber")
                         .IsUnique();
 
-                    b.ToTable("Sessions", (string)null);
+                    b.ToTable("Sessions");
                 });
 
             modelBuilder.Entity("Storykeeper.Api.Domain.AdventureDraft", b =>

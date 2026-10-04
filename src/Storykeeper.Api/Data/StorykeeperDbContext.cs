@@ -16,6 +16,7 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
     public DbSet<Campaign> Campaigns => Set<Campaign>();
     public DbSet<CampaignBrief> CampaignBriefs => Set<CampaignBrief>();
     public DbSet<CampaignDraft> CampaignDrafts => Set<CampaignDraft>();
+    public DbSet<AdventureDraft> AdventureDrafts => Set<AdventureDraft>();
     public DbSet<CampaignBibleVersion> CampaignBibleVersions => Set<CampaignBibleVersion>();
     public DbSet<CampaignSettings> CampaignSettings => Set<CampaignSettings>();
     public DbSet<CampaignBible> CampaignBibles => Set<CampaignBible>();
@@ -68,6 +69,26 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
                 .HasForeignKey(draft => draft.CampaignId)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(draft => draft.CampaignBriefId);
+        });
+
+        modelBuilder.Entity<AdventureDraft>(entity =>
+        {
+            entity.HasKey(draft => draft.Id);
+            entity.Property(draft => draft.ContentJson).HasMaxLength(16000).IsRequired();
+            entity.Property(draft => draft.ParentPreferences).HasMaxLength(500);
+            entity.ToTable(table =>
+            {
+                table.HasCheckConstraint("CK_AdventureDrafts_SessionLength", "SessionLengthMinutes IN (30, 45, 60)");
+                table.HasCheckConstraint("CK_AdventureDrafts_GenerationNumber", "GenerationNumber >= 1");
+            });
+            entity.HasOne<Campaign>()
+                .WithMany()
+                .HasForeignKey(draft => draft.CampaignId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(draft => new { draft.CampaignId, draft.UpdatedAtUtc });
+            entity.HasIndex(draft => draft.ActivatedQuestId)
+                .IsUnique()
+                .HasFilter("ActivatedQuestId IS NOT NULL");
         });
 
         modelBuilder.Entity<Campaign>(entity =>
@@ -139,7 +160,7 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
             entity.Property(location => location.Name).HasMaxLength(120).IsRequired();
             entity.Property(location => location.Description).HasMaxLength(2000).IsRequired();
             entity.HasAlternateKey(location => new { location.CampaignId, location.Id });
-        });
+        }, campaignNavigation: campaign => campaign.Locations);
         ConfigureCampaignEntity<Npc>(modelBuilder, entity =>
         {
             entity.Property(npc => npc.Name).HasMaxLength(120).IsRequired();
@@ -150,11 +171,14 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
                 .HasForeignKey(npc => new { npc.CampaignId, npc.LocationId })
                 .HasPrincipalKey(location => new { location.CampaignId, location.Id })
                 .OnDelete(DeleteBehavior.Restrict);
-        });
+        }, campaignNavigation: campaign => campaign.Npcs);
         ConfigureCampaignEntity<Quest>(modelBuilder, entity =>
         {
             entity.Property(quest => quest.Title).HasMaxLength(160).IsRequired();
             entity.Property(quest => quest.Description).HasMaxLength(2000).IsRequired();
+            entity.Property(quest => quest.AdventurePlanJson).HasMaxLength(12000);
+            entity.ToTable(table => table.HasCheckConstraint(
+                "CK_Quests_SessionLength", "SessionLengthMinutes IS NULL OR SessionLengthMinutes IN (30, 45, 60)"));
         }, campaignNavigation: campaign => campaign.Quests);
         ConfigureCampaignEntity<Session>(modelBuilder, entity =>
         {

@@ -21,4 +21,6 @@ public sealed class Campaign
     public Party? Party { get; set; }
     public ICollection<Quest> Quests { get; set; } = new List<Quest>();
     public ICollection<Session> Sessions { get; set; } = new List<Session>();
+    public ICollection<Npc> Npcs { get; set; } = new List<Npc>();
+    public ICollection<Location> Locations { get; set; } = new List<Location>();
 }

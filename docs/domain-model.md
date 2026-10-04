@@ -24,7 +24,12 @@ campaign's party, hero, location, or session.
   quantity.
 - `Location` and `Npc` store campaign-scoped world details. An NPC may
   reference a location in the same campaign.
-- `Quest` stores its title, description, and lifecycle status.
+- `Quest` stores its title, description, and lifecycle status. Activated
+  adventure quests also retain their validated structured episode plan and
+  selected 30-, 45-, or 60-minute target.
+- `AdventureDraft` stores one campaign-scoped episode plan, its parent pacing
+  preferences, generation number, review status, and the quest created when
+  activated. Drafts and their activated quest links cannot cross campaigns.
 - `Session` stores its sequence number, UTC start/end times, and optional
   factual summary. Starting a session resets each hero to 3 hearts and 1
   sparkle token. A running session must be summarized before another session
@@ -54,6 +59,9 @@ campaign's party, hero, location, or session.
   activated bible, including its source draft and version number.
 - `Reward` stores a campaign reward and may associate it with a hero from the
   same campaign.
+- `AdventureDraftContent` is a structured episode with an opening, 2-4 scenes,
+  at least two solution paths, 2-5 clues, a featured NPC, a gentle finale,
+  celebration or reward, and standalone/season-arc framing.
 
 Fact metadata is distinct from narration: a session summary is a compact
 recap, while a campaign fact is an individually categorized claim that can be
@@ -89,3 +97,9 @@ locations, and 1-4 adventure hooks. Generated and parent-edited drafts pass
 the same server-side validation before persistence. Only approved drafts can
 be activated. Activation writes the new campaign and its version 1 bible
 snapshot atomically.
+
+Adventure drafts require parent review and approval. Editing or regenerating
+clears approval. Activation creates the featured NPC and in-progress quest
+with its complete plan in one transaction, and marks any prior in-progress
+quest completed. Active facts and recent summaries used for generation are
+read only from the owning campaign.

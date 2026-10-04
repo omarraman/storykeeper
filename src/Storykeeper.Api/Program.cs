@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Storykeeper.Api.Data;
 using Storykeeper.Api.Contracts;
@@ -6,6 +8,8 @@ using Storykeeper.Api.Services;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
 
 var connectionString = builder.Configuration.GetConnectionString("Storykeeper")
     ?? throw new InvalidOperationException("The Storykeeper database connection string is not configured.");
@@ -18,6 +22,12 @@ builder.Services.AddScoped<IGameRulesService, GameRulesService>();
 builder.Services.AddScoped<ICampaignBriefService, CampaignBriefService>();
 builder.Services.AddScoped<ICampaignContinuityService, CampaignContinuityService>();
 builder.Services.Configure<StorykeeperAiOptions>(builder.Configuration.GetSection("Storykeeper:Ai"));
+builder.Services.AddHttpClient<IAdventureDraftGenerator, OpenAiCompatibleAdventureDraftGenerator>((services, client) =>
+{
+    var options = services.GetRequiredService<IOptions<StorykeeperAiOptions>>().Value;
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds is >= 10 and <= 180 ? options.TimeoutSeconds : 60);
+});
+builder.Services.AddScoped<IAdventureDraftService, AdventureDraftService>();
 builder.Services.AddHttpClient<ICampaignDraftGenerator, OpenAiCompatibleCampaignDraftGenerator>((services, client) =>
 {
     var options = services.GetRequiredService<IOptions<StorykeeperAiOptions>>().Value;
@@ -43,6 +53,178 @@ app.MapGet("/api/health", () => Results.Ok(new { status = "Healthy" }));
 
 app.MapGet("/api/campaigns", async (ICampaignService campaigns, CancellationToken cancellationToken) =>
     Results.Ok((await campaigns.ListAsync(cancellationToken)).Select(CampaignResponse.From)));
+
+app.MapGet("/api/campaigns/{campaignId:guid}/adventure-drafts", async (
+    Guid campaignId,
+    IAdventureDraftService adventures,
+    CancellationToken cancellationToken) =>
+{
+    var drafts = await adventures.ListAsync(campaignId, cancellationToken);
+    return drafts is null
+        ? Results.NotFound()
+        : Results.Ok(drafts.Select(AdventureDraftResponse.From));
+});
+
+app.MapGet("/api/adventure-drafts/{draftId:guid}", async (
+    Guid draftId,
+    IAdventureDraftService adventures,
+    CancellationToken cancellationToken) =>
+{
+    var draft = await adventures.GetAsync(draftId, cancellationToken);
+    return draft is null ? Results.NotFound() : Results.Ok(AdventureDraftResponse.From(draft));
+});
+
+app.MapPost("/api/campaigns/{campaignId:guid}/adventure-drafts", async (
+    Guid campaignId,
+    AdventureDraftRequest? request,
+    IAdventureDraftService adventures,
+    CancellationToken cancellationToken) =>
+{
+    var errors = AdventureDraftRequestValidator.Validate(request);
+    if (errors.Count > 0)
+    {
+        return Results.ValidationProblem(errors);
+    }
+
+    try
+    {
+        var result = await adventures.GenerateAsync(campaignId, request!, cancellationToken);
+        return result.Status switch
+        {
+            AdventureDraftOperationStatus.NotFound => Results.NotFound(),
+            AdventureDraftOperationStatus.Conflict => Results.Problem(
+                statusCode: 409, title: "Adventure cannot be generated",
+                detail: "Adventure drafts can only be generated for an active campaign between sessions."),
+            _ => Results.Created($"/api/adventure-drafts/{result.Draft!.Id}", AdventureDraftResponse.From(result.Draft))
+        };
+    }
+    catch (AdventureDraftGenerationException exception)
+    {
+        return Results.Problem(statusCode: exception.StatusCode, title: "Adventure generation failed", detail: exception.Message);
+    }
+    catch (AdventureDraftRejectedException exception)
+    {
+        return Results.ValidationProblem(exception.Errors, statusCode: 422, title: "Adventure draft rejected", detail: exception.Message);
+    }
+});
+
+app.MapPost("/api/adventure-drafts/{draftId:guid}/regenerate", async (
+    Guid draftId,
+    IAdventureDraftService adventures,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var result = await adventures.RegenerateAsync(draftId, cancellationToken);
+        return result.Status switch
+        {
+            AdventureDraftOperationStatus.NotFound => Results.NotFound(),
+            AdventureDraftOperationStatus.Conflict => Results.Problem(
+                statusCode: 409, title: "Adventure cannot be regenerated",
+                detail: "Adventure drafts can only be regenerated for an active campaign between sessions."),
+            AdventureDraftOperationStatus.AlreadyActivated => Results.Problem(
+                statusCode: 409, title: "Adventure already activated", detail: "Activated adventures cannot be regenerated."),
+            _ => Results.Ok(AdventureDraftResponse.From(result.Draft!))
+        };
+    }
+    catch (AdventureDraftGenerationException exception)
+    {
+        return Results.Problem(statusCode: exception.StatusCode, title: "Adventure generation failed", detail: exception.Message);
+    }
+    catch (AdventureDraftRejectedException exception)
+    {
+        return Results.ValidationProblem(exception.Errors, statusCode: 422, title: "Adventure draft rejected", detail: exception.Message);
+    }
+});
+
+app.MapPut("/api/adventure-drafts/{draftId:guid}", async (
+    Guid draftId,
+    AdventureDraftContent? content,
+    IAdventureDraftService adventures,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var result = await adventures.UpdateAsync(draftId, content!, cancellationToken);
+        return result.Status switch
+        {
+            AdventureDraftOperationStatus.NotFound => Results.NotFound(),
+            AdventureDraftOperationStatus.AlreadyActivated => Results.Problem(
+                statusCode: 409, title: "Adventure already activated", detail: "Activated adventures cannot be edited."),
+            _ => Results.Ok(AdventureDraftResponse.From(result.Draft!))
+        };
+    }
+    catch (AdventureDraftRejectedException exception)
+    {
+        return Results.ValidationProblem(exception.Errors, statusCode: 422, title: "Adventure draft rejected");
+    }
+});
+
+app.MapPost("/api/adventure-drafts/{draftId:guid}/approve", async (
+    Guid draftId,
+    IAdventureDraftService adventures,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var result = await adventures.ApproveAsync(draftId, cancellationToken);
+        return result.Status switch
+        {
+            AdventureDraftOperationStatus.NotFound => Results.NotFound(),
+            AdventureDraftOperationStatus.AlreadyActivated => Results.Problem(
+                statusCode: 409, title: "Adventure already activated", detail: "Activated adventures cannot be re-approved."),
+            _ => Results.Ok(AdventureDraftResponse.From(result.Draft!))
+        };
+    }
+    catch (AdventureDraftRejectedException exception)
+    {
+        return Results.ValidationProblem(exception.Errors, statusCode: 422, title: "Adventure draft rejected", detail: exception.Message);
+    }
+});
+
+app.MapPost("/api/adventure-drafts/{draftId:guid}/activate", async (
+    Guid draftId,
+    IAdventureDraftService adventures,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var result = await adventures.ActivateAsync(draftId, cancellationToken);
+        return result.Status switch
+        {
+            AdventureDraftOperationStatus.NotFound => Results.NotFound(),
+            AdventureDraftOperationStatus.Conflict => Results.Problem(
+                statusCode: 409, title: "Adventure cannot be activated",
+                detail: "Adventures can only be activated for an active campaign between sessions."),
+            AdventureDraftOperationStatus.AlreadyActivated => Results.Problem(
+                statusCode: 409, title: "Adventure already activated", detail: "This adventure has already been added to the campaign."),
+            _ => Results.Ok(AdventureDraftResponse.From(result.Draft!))
+        };
+    }
+    catch (RuleConflictException exception)
+    {
+        return Results.Problem(statusCode: 409, title: "Adventure cannot be activated", detail: exception.Message);
+    }
+    catch (AdventureDraftRejectedException exception)
+    {
+        return Results.ValidationProblem(exception.Errors, statusCode: 422, title: "Adventure draft rejected", detail: exception.Message);
+    }
+});
+
+app.MapDelete("/api/adventure-drafts/{draftId:guid}", async (
+    Guid draftId,
+    IAdventureDraftService adventures,
+    CancellationToken cancellationToken) =>
+{
+    var result = await adventures.DeleteAsync(draftId, cancellationToken);
+    return result.Status switch
+    {
+        AdventureDraftOperationStatus.NotFound => Results.NotFound(),
+        AdventureDraftOperationStatus.AlreadyActivated => Results.Problem(
+            statusCode: 409, title: "Adventure already activated", detail: "Activated adventures cannot be discarded."),
+        _ => Results.NoContent()
+    };
+});
 
 app.MapPost("/api/campaigns/{campaignId:guid}/actions", async (
     Guid campaignId,

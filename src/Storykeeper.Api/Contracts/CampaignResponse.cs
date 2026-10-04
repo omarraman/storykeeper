@@ -88,10 +88,20 @@ public sealed record HeroResponse(
 
 public sealed record InventoryItemResponse(string Name, string Description, int Quantity);
 
-public sealed record QuestResponse(Guid Id, string Title, string Description, string Status)
+public sealed record QuestResponse(
+    Guid Id,
+    string Title,
+    string Description,
+    string Status,
+    int? SessionLengthMinutes)
 {
     public static QuestResponse From(Quest quest) =>
-        new(quest.Id, quest.Title, quest.Description, quest.Status.ToString());
+        new(
+            quest.Id,
+            quest.Title,
+            quest.Description,
+            quest.Status.ToString(),
+            quest.SessionLengthMinutes);
 }
 
 public sealed record SessionResponse(

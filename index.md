@@ -20,6 +20,8 @@ Current implementation focus:
   server-enforced child-safety boundaries.
 - Structured AI campaign drafts with parent review, editing, approval,
   isolated activation, and versioned campaign bibles.
+- Campaign-scoped next-adventure plans with selected pacing, parent review,
+  editable regeneration, and activation into saved quests.
 - Tablet-friendly campaign library with create, list, complete, archive,
   delete, and saved campaign resume.
 - Tablet landscape adventure-play screen with suggested and free-text actions,
@@ -52,6 +54,7 @@ Current implementation focus:
 | [Game rules](docs/game-rules.md) | Child-friendly d20 rules, hearts, sparkle tokens, and consequences | Available |
 | [Adventure play](docs/adventure-play.md) | Play screen, session wrap-up, parent continuity controls, typed turn-client boundary, and authoritative roll integration | Available |
 | [Campaign generation](docs/campaign-generation.md) | CampaignBrief wizard, validated generation, approval, activation, and bible versions | Available |
+| [Next playable adventures](docs/next-adventures.md) | Session-length preferences, continuity-aware episode plans, parent review, and quest activation | Available |
 | [AI Storykeeper](docs/ai-storykeeper.md) | Prompting, schemas, turn processing, validation, and relevance-selected continuity | Available |
 | [Safety and parent controls](docs/safety-and-parent-controls.md) | Safety defaults, settings, parent PIN, pacing, and overrides | Planned |
 | [ADR directory](docs/decisions/) | Long-lived architecture decisions and their rationale | Planned |

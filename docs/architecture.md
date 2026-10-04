@@ -39,20 +39,24 @@ fact and summary corrections are stored in campaign-scoped append-only
 continuity revisions, including prior and replacement content.
 
 The tablet adventure screen consumes a typed `AdventureTurnClient` interface.
-Its current `DemoAdventureTurnClient` supplies deterministic local story beats
-and sample clues; fixture narration does not call an AI provider or persist
-story state. Session creation/resume and real-hero d20 checks use the existing
-server endpoints. When live gameplay narration is implemented, an HTTP turn
-client can replace the demo adapter without coupling fixture content to React views.
-If a campaign has no server-owned heroes, a visibly marked in-memory preview
-party supports UI exploration only; its die entry does not resolve game rules
-or persist resources.
+Campaigns with server-owned heroes use the server AI turn API and authoritative
+session and d20 endpoints. The deterministic local demo adapter is retained
+only for empty-world UI preview; its narration and die entry do not save state
+or resolve rules. This keeps fixture content out of React views without
+exposing provider credentials to the browser.
 
 Campaign-generation inputs are saved as independent `CampaignBrief` drafts
 through `/api/campaign-briefs`. The API supports list, create, read, update,
 and delete operations with server-side request validation and server-owned
 safety boundaries. A brief is not a campaign and is not converted into
 campaign state until a later generation and approval workflow.
+
+Parents can generate campaign-scoped adventure drafts from the campaign room.
+The API builds continuity context from that campaign's bible, active facts,
+recent saved session summaries, quests, NPCs, and locations. Reviewed,
+approved plans activate transactionally as in-progress quests; each quest
+stores its structured plan and approximate session length. See
+[Next playable adventures](next-adventures.md) for the endpoints and lifecycle.
 
 ## Storage configuration
 
@@ -83,6 +87,8 @@ Live gameplay narration uses the server-side
 `POST /api/campaigns/{campaignId}/actions` endpoint, detailed in
 [AI Storykeeper](ai-storykeeper.md). The API loads a campaign-scoped context
 and validates strict structured output before it is returned or applied.
+For an activated adventure, that context includes the server-saved episode
+plan so narration follows the reviewed opening, scenes, clues, and finale.
 Validated fact proposals are persisted as proposed facts by server-side logic;
 AI output cannot write state directly or change quest status, hero resources,
 rules, or dice outcomes. The server-side d20 rules engine remains authoritative.

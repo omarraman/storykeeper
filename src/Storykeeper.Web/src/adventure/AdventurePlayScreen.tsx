@@ -240,6 +240,7 @@ export function AdventurePlayScreen({
             <div className="adventure-current-quest">
               <span className="card-kicker">CURRENT QUEST</span>
               <strong>{state.currentQuest.title}</strong>
+              {state.currentQuest.sessionLengthMinutes && <span>About {state.currentQuest.sessionLengthMinutes} minutes</span>}
               <span>{state.currentQuest.description}</span>
             </div>
           )}

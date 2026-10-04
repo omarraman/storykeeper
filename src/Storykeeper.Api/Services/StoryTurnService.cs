@@ -10,7 +10,7 @@ public sealed class StoryTurnService(
     StorykeeperDbContext dbContext,
     IStoryTurnGenerator generator) : IStoryTurnService
 {
-    private static readonly JsonSerializerOptions ContextJsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions ContextJsonOptions = AdventureDraftJson.Options;
 
     public async Task<StoryTurnResponse?> SubmitActionAsync(
         Guid campaignId,
@@ -151,7 +151,12 @@ public sealed class StoryTurnService(
             currentQuest = currentQuest is null ? null : new
             {
                 currentQuest.Title,
-                description = Limit(currentQuest.Description, 800)
+                description = Limit(currentQuest.Description, 800),
+                sessionLengthMinutes = currentQuest.SessionLengthMinutes,
+                adventurePlan = currentQuest.AdventurePlanJson is null
+                    ? null
+                    : JsonSerializer.Deserialize<AdventureDraftContent>(
+                        currentQuest.AdventurePlanJson, ContextJsonOptions)
             },
             completedQuests = completedQuests.Select(quest => new
             {

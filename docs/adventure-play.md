@@ -27,6 +27,13 @@ validates the hero, session, die result, strength, sparkle token, and outcome,
 then persists the resource changes. The UI refreshes and displays those
 server-returned values; it does not resolve the check.
 
+An activated, parent-reviewed adventure plan is saved with its current quest.
+The server includes that plan in live narration context to guide the episode's
+opening, scenes, clues, routes, and gentle finale without limiting player
+actions. A parent can add the next episode after the current session is
+summarized; activation starts its quest and completes the prior in-progress
+quest.
+
 At session end, a parent enters a compact factual recap in the play screen.
 Saving the recap ends the current session; a new session cannot silently close
 an unfinished one. The campaign room's continuity controls let a parent add

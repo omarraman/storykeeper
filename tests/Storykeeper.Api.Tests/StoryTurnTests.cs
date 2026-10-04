@@ -23,6 +23,26 @@ public sealed class StoryTurnTests
         await using var database = await TestDatabase.CreateAsync();
         var campaign = await CreatePlayableCampaignAsync(database.Context, "Lantern Garden");
         var otherCampaign = await CreatePlayableCampaignAsync(database.Context, "Other World");
+        var quest = await database.Context.Quests.SingleAsync(item => item.CampaignId == campaign.Campaign.Id);
+        quest.Title = "The Lantern's Lost Tune";
+        quest.Description = "Help Mira restore a missing garden song.";
+        quest.SessionLengthMinutes = 45;
+        quest.AdventurePlanJson = JsonSerializer.Serialize(new AdventureDraftContent(
+                "The Lantern's Lost Tune",
+                "Help Mira restore a missing garden song.",
+                AdventureArcType.Standalone,
+                null,
+                "Mira hears a melody inside a lantern.",
+                [new AdventureScene("Follow the notes", "Look for bright leaves.", "Mira"),
+                 new AdventureScene("Ask the birds", "Listen to a friendly riddle.", "Mira")],
+                ["Follow the leaves.", "Ask the birds."],
+                [new AdventureClue("Silver leaf", "It matches the song."),
+                 new AdventureClue("Bird rhyme", "It points to the bellflower.")],
+                new AdventureDraftNpc("Mira", "A kind mapmaker.", "Helpful."),
+                "The garden sings together.",
+                "Everyone shares a picnic."),
+                AdventureDraftJson.Options);
+        await database.Context.SaveChangesAsync();
         var generator = new TestGenerator(StoryContent(
             facts: [new StoryTurnFactProposal("clue", "The map shows a silver star.", 4)]));
         var service = new StoryTurnService(database.Context, generator);
@@ -39,6 +59,11 @@ public sealed class StoryTurnTests
         var contextText = context.RootElement.GetRawText();
         Assert.Contains("Lantern Garden", contextText);
         Assert.DoesNotContain("Other World", contextText);
+        var currentQuest = context.RootElement.GetProperty("currentQuest");
+        Assert.Equal(45, currentQuest.GetProperty("sessionLengthMinutes").GetInt32());
+        Assert.Equal(
+            "The Lantern's Lost Tune",
+            currentQuest.GetProperty("adventurePlan").GetProperty("title").GetString());
         Assert.Equal(CampaignFactStatus.Proposed,
             (await database.Context.CampaignFacts.SingleAsync()).Status);
         Assert.Equal(campaign.Session.Id,
