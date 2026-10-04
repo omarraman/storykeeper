@@ -15,6 +15,8 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
 
     public DbSet<Campaign> Campaigns => Set<Campaign>();
     public DbSet<CampaignBrief> CampaignBriefs => Set<CampaignBrief>();
+    public DbSet<CampaignDraft> CampaignDrafts => Set<CampaignDraft>();
+    public DbSet<CampaignBibleVersion> CampaignBibleVersions => Set<CampaignBibleVersion>();
     public DbSet<CampaignSettings> CampaignSettings => Set<CampaignSettings>();
     public DbSet<CampaignBible> CampaignBibles => Set<CampaignBible>();
     public DbSet<Party> Parties => Set<Party>();
@@ -51,6 +53,21 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
                 .Metadata.SetValueComparer(StringListComparer);
         });
 
+        modelBuilder.Entity<CampaignDraft>(entity =>
+        {
+            entity.HasKey(draft => draft.Id);
+            entity.Property(draft => draft.ContentJson).HasMaxLength(30000).IsRequired();
+            entity.HasOne(draft => draft.CampaignBrief)
+                .WithMany(brief => brief.Drafts)
+                .HasForeignKey(draft => draft.CampaignBriefId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Campaign>()
+                .WithMany()
+                .HasForeignKey(draft => draft.CampaignId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(draft => draft.CampaignBriefId);
+        });
+
         modelBuilder.Entity<Campaign>(entity =>
         {
             entity.HasKey(campaign => campaign.Id);
@@ -80,6 +97,8 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
         {
             entity.Property(bible => bible.WorldDescription).HasMaxLength(4000).IsRequired();
             entity.Property(bible => bible.CurrentSituation).HasMaxLength(2000);
+            entity.Property(bible => bible.Version).HasDefaultValue(1);
+            entity.ToTable(table => table.HasCheckConstraint("CK_CampaignBibles_Version", "Version >= 1"));
         }, configureCampaignRelationship: false);
         ConfigureCampaignEntity<Party>(modelBuilder, entity =>
         {
@@ -160,6 +179,20 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
                 .HasForeignKey(reward => new { reward.CampaignId, reward.HeroId })
                 .HasPrincipalKey(hero => new { hero.CampaignId, hero.Id })
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+        ConfigureCampaignEntity<CampaignBibleVersion>(modelBuilder, entity =>
+        {
+            entity.Property(version => version.Title).HasMaxLength(120).IsRequired();
+            entity.Property(version => version.ContentJson).HasMaxLength(30000).IsRequired();
+            entity.ToTable(table => table.HasCheckConstraint("CK_CampaignBibleVersions_Version", "Version >= 1"));
+            entity.HasIndex(version => new { version.CampaignId, version.Version }).IsUnique();
+            entity.HasIndex(version => version.SourceDraftId)
+                .IsUnique()
+                .HasFilter("SourceDraftId IS NOT NULL");
+            entity.HasOne<CampaignDraft>()
+                .WithMany()
+                .HasForeignKey(version => version.SourceDraftId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 

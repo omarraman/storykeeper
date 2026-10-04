@@ -26,4 +26,5 @@ public sealed class CampaignBrief
     public List<string> SafetyBoundaries { get; set; } = CampaignBriefDefaults.SafetyBoundaries.ToList();
     public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+    public ICollection<CampaignDraft> Drafts { get; set; } = new List<CampaignDraft>();
 }

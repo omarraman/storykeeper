@@ -18,6 +18,8 @@ Current implementation focus:
 
 - Parent-led campaign brief wizard with saved, editable, discardable drafts and
   server-enforced child-safety boundaries.
+- Structured AI campaign drafts with parent review, editing, approval,
+  isolated activation, and versioned campaign bibles.
 - Tablet-friendly campaign library with create, list, complete, archive,
   delete, and saved campaign resume.
 - Reusable campaign/domain model with SQLite persistence and campaign isolation.
@@ -42,7 +44,7 @@ Current implementation focus:
 | [Architecture](docs/architecture.md) | Web PWA, API, persistence, and AI integration boundaries | Available |
 | [Domain model](docs/domain-model.md) | Campaigns, heroes, NPCs, facts, quests, sessions, and inventory | Available |
 | [Game rules](docs/game-rules.md) | Child-friendly d20 rules, hearts, sparkle tokens, and consequences | Planned |
-| [Campaign generation](docs/campaign-generation.md) | CampaignBrief wizard, draft persistence, and future generation workflow | Available |
+| [Campaign generation](docs/campaign-generation.md) | CampaignBrief wizard, validated generation, approval, activation, and bible versions | Available |
 | [AI Storykeeper](docs/ai-storykeeper.md) | Prompting, schemas, tools, turn processing, validation, and continuity | Planned |
 | [Safety and parent controls](docs/safety-and-parent-controls.md) | Safety defaults, settings, parent PIN, pacing, and overrides | Planned |
 | [ADR directory](docs/decisions/) | Long-lived architecture decisions and their rationale | Planned |

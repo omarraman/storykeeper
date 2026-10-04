@@ -15,7 +15,8 @@ campaign's party, hero, location, or session.
   remain resumable; archived campaigns preserve their saved data for
   read-only viewing.
 - `CampaignSettings` stores theme, tone, and the low-fright safety default.
-- `CampaignBible` stores durable world description and current situation.
+- `CampaignBible` stores durable world description, current situation, and
+  current version number.
 - `Party` groups the campaign's `Hero` records. Heroes track description,
   role, hearts, sparkle tokens, and their inventory.
 - `InventoryItem` belongs to one hero and stores its name, description, and
@@ -34,6 +35,11 @@ campaign's party, hero, location, or session.
   title, genre, tone, intended campaign and session lengths, optional
   inclusions and exclusions, and a free-text story idea. Briefs are saved
   independently of campaigns and have creation/update timestamps.
+- `CampaignDraft` stores a validated, structured generated draft linked to
+  its brief. It tracks generation number, pending-review/approved/activated
+  status, and the activated campaign when present.
+- `CampaignBibleVersion` stores a campaign-scoped immutable snapshot of each
+  activated bible, including its source draft and version number.
 - `Reward` stores a campaign reward and may associate it with a hero from the
   same campaign.
 
@@ -63,3 +69,9 @@ cruelty, mature themes, permanent character death, or mandatory tactical
 combat, and low-fright, age-appropriate content. These boundaries are not
 editable through the brief API. Campaign and session lengths are validated
 server-side to 1-30 sessions and 15-180 minutes respectively.
+
+Campaign drafts require 3-6 world rules, 3-5 unique NPCs, 3-6 unique
+locations, and 1-4 adventure hooks. Generated and parent-edited drafts pass
+the same server-side validation before persistence. Only approved drafts can
+be activated. Activation writes the new campaign and its version 1 bible
+snapshot atomically.

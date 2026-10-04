@@ -20,6 +20,42 @@ type CampaignBrief = CampaignBriefInput & {
   createdAtUtc: string
   updatedAtUtc: string
 }
+type CampaignDraftContent = {
+  title: string
+  premise: string
+  centralMystery: string
+  worldRules: string[]
+  npcs: { name: string; description: string; disposition: string; locationName: string | null }[]
+  locations: { name: string; description: string }[]
+  adventureHooks: { title: string; description: string }[]
+  safety: {
+    lowFright: boolean
+    noGoreOrCruelty: boolean
+    noMatureThemes: boolean
+    noPermanentCharacterDeath: boolean
+    noMandatoryTacticalCombat: boolean
+  }
+}
+type CampaignDraft = {
+  id: string
+  campaignBriefId: string
+  campaignId: string | null
+  status: 'PendingReview' | 'Approved' | 'Activated'
+  generationNumber: number
+  content: CampaignDraftContent
+  createdAtUtc: string
+  updatedAtUtc: string
+  activatedAtUtc: string | null
+}
+
+const safetyLabels = [
+  'Low-fright and age-appropriate',
+  'No gore or cruelty',
+  'No mature themes',
+  'No permanent character death',
+  'No mandatory tactical combat',
+]
+
 const briefSteps = ['The world', 'The adventure', 'Your guardrails']
 
 function newBrief(): CampaignBriefInput {
@@ -35,6 +71,17 @@ function newBrief(): CampaignBriefInput {
   }
 }
 
+function copyDraftContent(content: CampaignDraftContent): CampaignDraftContent {
+  return {
+    ...content,
+    worldRules: [...content.worldRules],
+    npcs: content.npcs.map((npc) => ({ ...npc })),
+    locations: content.locations.map((location) => ({ ...location })),
+    adventureHooks: content.adventureHooks.map((hook) => ({ ...hook })),
+    safety: { ...content.safety },
+  }
+}
+
 type Campaign = {
   id: string
   name: string
@@ -46,6 +93,7 @@ type Campaign = {
   theme: string
   tone: string
   lowFright: boolean
+  bibleVersion: number
   worldDescription: string
   currentSituation: string | null
   partyName: string
@@ -85,10 +133,10 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   })
 
   if (!response.ok) {
-    const details = await response.json().catch(() => null) as { title?: string; errors?: Record<string, string[]> } | null
+    const details = await response.json().catch(() => null) as { title?: string; detail?: string; errors?: Record<string, string[]> } | null
     const message = details?.errors
       ? Object.values(details.errors).flat().join(' ')
-      : details?.title ?? `The story server returned ${response.status}.`
+      : details?.detail ?? details?.title ?? `The story server returned ${response.status}.`
     throw new Error(message)
   }
 
@@ -100,7 +148,11 @@ function App() {
   const [apiStatus, setApiStatus] = useState<ApiStatus>('checking')
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [briefs, setBriefs] = useState<CampaignBrief[]>([])
+  const [drafts, setDrafts] = useState<CampaignDraft[]>([])
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null)
+  const [selectedDraft, setSelectedDraft] = useState<CampaignDraft | null>(null)
+  const [draftForm, setDraftForm] = useState<CampaignDraftContent | null>(null)
+  const [editingDraft, setEditingDraft] = useState(false)
   const [activeTab, setActiveTab] = useState<CampaignTab>('Active')
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
@@ -150,11 +202,15 @@ function App() {
       setLoading(true)
       try {
         const storedId = localStorage.getItem(selectedCampaignKey)
-        const result = await request<Campaign[]>('/api/campaigns')
-        const savedBriefs = await request<CampaignBrief[]>('/api/campaign-briefs')
+        const [result, savedBriefs, savedDrafts] = await Promise.all([
+          request<Campaign[]>('/api/campaigns'),
+          request<CampaignBrief[]>('/api/campaign-briefs'),
+          request<CampaignDraft[]>('/api/campaign-drafts'),
+        ])
         if (stopped) return
         setCampaigns(result)
         setBriefs(savedBriefs)
+        setDrafts(savedDrafts)
         if (storedId && result.some((campaign) => campaign.id === storedId)) {
           const storedCampaign = await request<Campaign>(`/api/campaigns/${encodeURIComponent(storedId)}`)
           if (stopped) return
@@ -176,6 +232,8 @@ function App() {
 
   const selectCampaign = (campaign: Campaign) => {
     setSelectedCampaign(campaign)
+    setSelectedDraft(null)
+    setEditingDraft(false)
     localStorage.setItem(selectedCampaignKey, campaign.id)
     setError('')
   }
@@ -204,6 +262,162 @@ function App() {
     } : newBrief())
     setWizardStep(0)
     setShowWizard(true)
+  }
+
+  const openDraft = (draft: CampaignDraft) => {
+    setSelectedCampaign(null)
+    setSelectedDraft(draft)
+    setDraftForm(copyDraftContent(draft.content))
+    setEditingDraft(false)
+    setError('')
+  }
+
+  const setSavedDraft = (draft: CampaignDraft) => {
+    setSelectedDraft(draft)
+    setDraftForm(copyDraftContent(draft.content))
+    setDrafts((current) => [draft, ...current.filter((item) => item.id !== draft.id)])
+  }
+
+  const generateDraft = async (brief: CampaignBrief) => {
+    setSaving(true)
+    setError('')
+    try {
+      const draft = await request<CampaignDraft>(`/api/campaign-briefs/${encodeURIComponent(brief.id)}/drafts`, { method: 'POST' })
+      setDrafts((current) => [draft, ...current])
+      openDraft(draft)
+    } catch (generationError) {
+      setError(generationError instanceof Error ? generationError.message : 'Could not generate this campaign draft.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const regenerateDraft = async () => {
+    if (!selectedDraft || !window.confirm('Regenerate this draft? Its current generated text will be replaced.')) return
+    setSaving(true)
+    setError('')
+    try {
+      const updated = await request<CampaignDraft>(`/api/campaign-drafts/${encodeURIComponent(selectedDraft.id)}/regenerate`, { method: 'POST' })
+      setSavedDraft(updated)
+      setEditingDraft(false)
+    } catch (generationError) {
+      setError(generationError instanceof Error ? generationError.message : 'Could not regenerate this campaign draft.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const saveDraftEdits = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!selectedDraft || !draftForm) return
+    setSaving(true)
+    setError('')
+    try {
+      const updated = await request<CampaignDraft>(`/api/campaign-drafts/${encodeURIComponent(selectedDraft.id)}`, {
+        method: 'PUT',
+        body: JSON.stringify(draftForm),
+      })
+      setSavedDraft(updated)
+      setEditingDraft(false)
+    } catch (editError) {
+      setError(editError instanceof Error ? editError.message : 'Could not save campaign draft edits.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const approveDraft = async () => {
+    if (!selectedDraft) return
+    setSaving(true)
+    setError('')
+    try {
+      const approved = await request<CampaignDraft>(`/api/campaign-drafts/${encodeURIComponent(selectedDraft.id)}/approve`, { method: 'POST' })
+      setSavedDraft(approved)
+    } catch (approvalError) {
+      setError(approvalError instanceof Error ? approvalError.message : 'Could not approve this campaign draft.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const activateDraft = async () => {
+    if (!selectedDraft || !window.confirm(`Activate “${selectedDraft.content.title}” as a new, separate story world?`)) return
+    setSaving(true)
+    setError('')
+    try {
+      const campaign = await request<Campaign>(`/api/campaign-drafts/${encodeURIComponent(selectedDraft.id)}/activate`, { method: 'POST' })
+      const activated = {
+        ...selectedDraft,
+        campaignId: campaign.id,
+        status: 'Activated' as const,
+        activatedAtUtc: campaign.createdAtUtc,
+        updatedAtUtc: campaign.updatedAtUtc,
+      }
+      setDrafts((current) => current.map((item) => item.id === activated.id ? activated : item))
+      setSelectedDraft(null)
+      setDraftForm(null)
+      await refreshCampaigns(campaign.id)
+      setActiveTab('Active')
+    } catch (activationError) {
+      setError(activationError instanceof Error ? activationError.message : 'Could not activate this story world.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const discardDraft = async (draft: CampaignDraft) => {
+    if (!window.confirm(`Discard the campaign draft “${draft.content.title}”?`)) return
+    setSaving(true)
+    setError('')
+    try {
+      await request<void>(`/api/campaign-drafts/${encodeURIComponent(draft.id)}`, { method: 'DELETE' })
+      setDrafts((current) => current.filter((item) => item.id !== draft.id))
+      if (selectedDraft?.id === draft.id) {
+        setSelectedDraft(null)
+        setDraftForm(null)
+        setEditingDraft(false)
+      }
+    } catch (discardError) {
+      setError(discardError instanceof Error ? discardError.message : 'Could not discard this campaign draft.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const leaveDraft = () => {
+    setSelectedDraft(null)
+    setDraftForm(null)
+    setEditingDraft(false)
+    setError('')
+  }
+
+  const editWorldRule = (index: number, value: string) => {
+    setDraftForm((current) => current
+      ? { ...current, worldRules: current.worldRules.map((rule, ruleIndex) => ruleIndex === index ? value : rule) }
+      : current)
+  }
+
+  const editNpc = (index: number, key: 'name' | 'description' | 'disposition' | 'locationName', value: string) => {
+    setDraftForm((current) => current
+      ? {
+        ...current,
+        npcs: current.npcs.map((npc, npcIndex) => npcIndex === index
+          ? { ...npc, [key]: key === 'locationName' && value === '' ? null : value }
+          : npc),
+      }
+      : current)
+  }
+
+  const editLocation = (index: number, key: 'name' | 'description', value: string) => {
+    setDraftForm((current) => current
+      ? { ...current, locations: current.locations.map((location, locationIndex) => locationIndex === index ? { ...location, [key]: value } : location) }
+      : current)
+  }
+
+  const editHook = (index: number, key: 'title' | 'description', value: string) => {
+    setDraftForm((current) => current
+      ? { ...current, adventureHooks: current.adventureHooks.map((hook, hookIndex) => hookIndex === index ? { ...hook, [key]: value } : hook) }
+      : current)
   }
 
   const createCampaign = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -235,6 +449,7 @@ function App() {
     try {
       await request<void>(`/api/campaign-briefs/${encodeURIComponent(brief.id)}`, { method: 'DELETE' })
       setBriefs((current) => current.filter((item) => item.id !== brief.id))
+      setDrafts((current) => current.filter((draft) => draft.campaignBriefId !== brief.id))
     } catch (discardError) {
       setError(discardError instanceof Error ? discardError.message : 'Could not discard this campaign brief.')
     }
@@ -441,6 +656,192 @@ function App() {
             </div>
           </form>
         </section>
+      ) : selectedDraft ? (
+        <section className="draft-review" aria-labelledby="draft-title">
+          <button className="text-button back-button" onClick={leaveDraft}>
+            <span aria-hidden="true">←</span> Campaign briefs and story worlds
+          </button>
+          <div className="draft-review-heading">
+            <div>
+              <p className="eyebrow">Campaign draft · Generation {selectedDraft.generationNumber} · {selectedDraft.status.replace(/([A-Z])/g, ' $1').trim()}</p>
+              <h1 id="draft-title">{selectedDraft.content.title}</h1>
+              <p className="intro">Review this story world before it becomes a playable campaign.</p>
+            </div>
+            {selectedDraft.status !== 'Activated' && !editingDraft && (
+              <div className="draft-review-tools">
+                <button className="button button-secondary" onClick={() => {
+                  setDraftForm(copyDraftContent(selectedDraft.content))
+                  setEditingDraft(true)
+                }}>Edit draft</button>
+                <button className="button button-secondary" disabled={saving} onClick={() => void regenerateDraft()}>
+                  {saving ? 'Working…' : 'Regenerate'}
+                </button>
+                <button className="text-button delete-action" disabled={saving} onClick={() => void discardDraft(selectedDraft)}>Discard</button>
+              </div>
+            )}
+          </div>
+          {error && <p className="alert" role="alert">{error}</p>}
+          {editingDraft && draftForm ? (
+            <form className="draft-edit-form" onSubmit={(event) => void saveDraftEdits(event)}>
+              <div className="draft-edit-overview">
+                <label>Campaign title
+                  <input required maxLength={120} value={draftForm.title}
+                    onChange={(event) => setDraftForm((current) => current ? { ...current, title: event.target.value } : current)} />
+                </label>
+                <label>Premise
+                  <textarea required maxLength={2000} rows={4} value={draftForm.premise}
+                    onChange={(event) => setDraftForm((current) => current ? { ...current, premise: event.target.value } : current)} />
+                </label>
+                <label>Central mystery
+                  <textarea required maxLength={1000} rows={3} value={draftForm.centralMystery}
+                    onChange={(event) => setDraftForm((current) => current ? { ...current, centralMystery: event.target.value } : current)} />
+                </label>
+                <fieldset>
+                  <legend>World rules</legend>
+                  {draftForm.worldRules.map((rule, index) => (
+                    <label key={index}>Rule {index + 1}
+                      <input required maxLength={240} value={rule} onChange={(event) => editWorldRule(index, event.target.value)} />
+                    </label>
+                  ))}
+                </fieldset>
+              </div>
+              <section className="draft-edit-section">
+                <h2>Recurring characters</h2>
+                <div className="draft-edit-grid">
+                  {draftForm.npcs.map((npc, index) => (
+                    <fieldset className="draft-edit-card" key={`${npc.name}-${index}`}>
+                      <legend>Character {index + 1}</legend>
+                      <label>Name
+                        <input required maxLength={100} value={npc.name} onChange={(event) => editNpc(index, 'name', event.target.value)} />
+                      </label>
+                      <label>Description
+                        <textarea required maxLength={500} rows={2} value={npc.description} onChange={(event) => editNpc(index, 'description', event.target.value)} />
+                      </label>
+                      <label>Personality
+                        <input required maxLength={240} value={npc.disposition} onChange={(event) => editNpc(index, 'disposition', event.target.value)} />
+                      </label>
+                      <label>Home location
+                        <select value={npc.locationName ?? ''} onChange={(event) => editNpc(index, 'locationName', event.target.value)}>
+                          <option value="">No fixed home</option>
+                          {draftForm.locations.map((location, locationIndex) => (
+                            <option key={`${location.name}-${locationIndex}`} value={location.name}>{location.name || `Location ${locationIndex + 1}`}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </fieldset>
+                  ))}
+                </div>
+              </section>
+              <section className="draft-edit-section">
+                <h2>Places to explore</h2>
+                <div className="draft-edit-grid">
+                  {draftForm.locations.map((location, index) => (
+                    <fieldset className="draft-edit-card" key={`${location.name}-${index}`}>
+                      <legend>Location {index + 1}</legend>
+                      <label>Name
+                        <input required maxLength={100} value={location.name} onChange={(event) => editLocation(index, 'name', event.target.value)} />
+                      </label>
+                      <label>Description
+                        <textarea required maxLength={500} rows={2} value={location.description} onChange={(event) => editLocation(index, 'description', event.target.value)} />
+                      </label>
+                    </fieldset>
+                  ))}
+                </div>
+              </section>
+              <section className="draft-edit-section">
+                <h2>Adventure hooks</h2>
+                <div className="draft-edit-grid">
+                  {draftForm.adventureHooks.map((hook, index) => (
+                    <fieldset className="draft-edit-card" key={`${hook.title}-${index}`}>
+                      <legend>Hook {index + 1}</legend>
+                      <label>Title
+                        <input required maxLength={120} value={hook.title} onChange={(event) => editHook(index, 'title', event.target.value)} />
+                      </label>
+                      <label>Description
+                        <textarea required maxLength={600} rows={3} value={hook.description} onChange={(event) => editHook(index, 'description', event.target.value)} />
+                      </label>
+                    </fieldset>
+                  ))}
+                </div>
+              </section>
+              <section className="draft-safety-note">
+                <p className="card-kicker">STORYKEEPER SAFETY PROMISES</p>
+                <ul className="safety-list">{safetyLabels.map((label) => <li key={label}>{label}</li>)}</ul>
+              </section>
+              <div className="wizard-actions">
+                <button className="text-button" type="button" disabled={saving} onClick={() => {
+                  setDraftForm(copyDraftContent(selectedDraft.content))
+                  setEditingDraft(false)
+                }}>Cancel edits</button>
+                <span className="wizard-action-spacer" />
+                <button className="button button-primary" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save edits'}</button>
+              </div>
+            </form>
+          ) : (
+            <>
+              <div className="draft-preview-grid">
+                <section className="room-panel draft-overview">
+                  <p className="card-kicker">THE PREMISE</p>
+                  <p>{selectedDraft.content.premise}</p>
+                  <div className="quest-note">
+                    <span className="card-kicker">CENTRAL MYSTERY</span>
+                    <strong>{selectedDraft.content.centralMystery}</strong>
+                  </div>
+                  <h2>World rules</h2>
+                  <ol className="draft-rules">{selectedDraft.content.worldRules.map((rule, index) => <li key={index}>{rule}</li>)}</ol>
+                  <h2>Adventure hooks</h2>
+                  <div className="draft-hook-list">
+                    {selectedDraft.content.adventureHooks.map((hook) => (
+                      <article className="draft-hook" key={hook.title}>
+                        <strong>{hook.title}</strong><p>{hook.description}</p>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+                <section className="room-panel">
+                  <p className="card-kicker">RECURRING CHARACTERS</p>
+                  <div className="draft-character-list">
+                    {selectedDraft.content.npcs.map((npc) => (
+                      <article className="draft-character" key={npc.name}>
+                        <h3>{npc.name}</h3>
+                        <p>{npc.description}</p>
+                        <span>{npc.disposition}{npc.locationName ? ` · At ${npc.locationName}` : ''}</span>
+                      </article>
+                    ))}
+                  </div>
+                  <h2>Places to explore</h2>
+                  <div className="draft-location-list">
+                    {selectedDraft.content.locations.map((location) => (
+                      <article className="draft-location" key={location.name}>
+                        <strong>{location.name}</strong><p>{location.description}</p>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              </div>
+              <section className="draft-safety-note">
+                <p className="card-kicker">SAFETY REVIEW</p>
+                <p>This draft keeps Storykeeper's child-safety promises in place.</p>
+                <ul className="safety-list">{safetyLabels.map((label) => <li key={label}>{label}</li>)}</ul>
+              </section>
+              <div className="draft-approval-bar">
+                {selectedDraft.status === 'PendingReview' && (
+                  <>
+                    <span>Only activate a draft after reviewing its story details.</span>
+                    <button className="button button-primary" disabled={saving} onClick={() => void approveDraft()}>Approve draft</button>
+                  </>
+                )}
+                {selectedDraft.status === 'Approved' && (
+                  <>
+                    <span>Parent approved · ready to create an isolated story world.</span>
+                    <button className="button button-primary" disabled={saving} onClick={() => void activateDraft()}>Activate campaign</button>
+                  </>
+                )}
+                {selectedDraft.status === 'Activated' && <span>This draft has been activated as a separate story world.</span>}
+              </div>
+            </>
+          )}
+        </section>
       ) : selectedCampaign ? (
         <section className="campaign-room" aria-labelledby="room-title">
           <button className="text-button back-button" onClick={() => setSelectedCampaign(null)}>
@@ -448,7 +849,7 @@ function App() {
           </button>
           <div className="room-heading">
             <div>
-              <p className="eyebrow">{selectedCampaign.theme || 'Your story world'} · {selectedCampaign.status}</p>
+              <p className="eyebrow">{selectedCampaign.theme || 'Your story world'} · Bible v{selectedCampaign.bibleVersion} · {selectedCampaign.status}</p>
               <h1 id="room-title">{selectedCampaign.name}</h1>
               <p className="intro">{selectedCampaign.description || 'A new adventure is ready to begin.'}</p>
             </div>
@@ -534,7 +935,37 @@ function App() {
                     </div>
                     <div className="brief-card-actions">
                       <button className="button button-secondary" onClick={() => startBrief(brief)}>Edit brief</button>
+                      <button className="button button-primary" disabled={saving} onClick={() => void generateDraft(brief)}>Generate draft</button>
                       <button className="text-button delete-action" onClick={() => void discardBrief(brief)}>Discard</button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {drafts.length > 0 && (
+            <section className="saved-briefs saved-drafts" aria-labelledby="saved-drafts-title">
+              <div className="saved-briefs-heading">
+                <div>
+                  <p className="card-kicker">PARENT REVIEW</p>
+                  <h2 id="saved-drafts-title">Campaign drafts</h2>
+                </div>
+                <span>{drafts.length} {drafts.length === 1 ? 'draft' : 'drafts'}</span>
+              </div>
+              <div className="brief-grid">
+                {drafts.map((draft) => (
+                  <article className="brief-card" key={draft.id}>
+                    <div>
+                      <p className="card-kicker">{draft.status.replace(/([A-Z])/g, ' $1').trim()} · Generation {draft.generationNumber}</p>
+                      <h3>{draft.content.title}</h3>
+                      <p>{draft.content.premise}</p>
+                    </div>
+                    <div className="brief-card-actions">
+                      <button className="button button-secondary" onClick={() => openDraft(draft)}>Review draft</button>
+                      {draft.status !== 'Activated' && (
+                        <button className="text-button delete-action" disabled={saving} onClick={() => void discardDraft(draft)}>Discard</button>
+                      )}
                     </div>
                   </article>
                 ))}

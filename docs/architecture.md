@@ -40,8 +40,23 @@ so it survives container recreation.
 
 ## AI boundary
 
-AI integration is not implemented in this slice. Campaign facts are durable,
+Campaign draft generation runs only on the API server through
+`ICampaignDraftGenerator`, implemented with an OpenAI-compatible Chat
+Completions client. `Storykeeper__Ai__BaseUrl`, `Storykeeper__Ai__Model`, and
+`Storykeeper__Ai__ApiKey` configure that client; the API key is never serialized
+to browser responses. The URL is restricted to HTTPS except loopback
+development endpoints. Generation requests use JSON-object mode, strict
+typed deserialization, and server-side structural and safety validation.
+Invalid output is not persisted or displayed. A parent must approve a valid,
+editable draft before activation.
+
+Draft activation is performed by server-side logic in one database
+transaction. It creates a new isolated campaign with generated settings,
+campaign bible, locations, NPCs, and quests, and stores a versioned bible
+snapshot. The browser cannot directly persist generated campaign state.
+
+Live gameplay narration is not implemented. Campaign facts remain durable,
 structured records distinct from session summaries or generated narration.
 Future AI features must propose schema-validated changes through server-side
-logic; AI output must not write to persistence directly or determine rules or
+logic; AI output must not directly persist game state or determine rules or
 dice outcomes.

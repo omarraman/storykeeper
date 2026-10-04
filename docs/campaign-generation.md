@@ -26,6 +26,51 @@ the parent's optional exclusions.
 
 Campaign length is bounded to 1-30 sessions and session length to 15-180
 minutes. The wizard currently offers common choices of 3, 6, or 10 sessions
-and 30, 45, 60, or 90 minutes. AI generation, approval, and conversion of a
-brief into a playable campaign are later workflow steps. The campaign library
-also retains a separate option to create an empty world without a brief.
+and 30, 45, 60, or 90 minutes. The campaign library also retains a separate
+option to create an empty world without a brief.
+
+## Generated campaign drafts
+
+The API sends a saved brief to a server-side OpenAI-compatible Chat Completions
+endpoint. Its system prompt targets a warm, funny, low-fright adventure for
+children aged 8 and 10, and preserves player agency and forward-moving
+setbacks. The provider response must be a JSON object deserializable to
+`CampaignDraftContent`; unknown fields are rejected. A draft must contain a
+title, premise, central mystery, 3-6 world rules, 3-5 distinct recurring NPCs,
+3-6 distinct locations, and 1-4 adventure hooks. NPCs may name a location
+only if it matches a location in the same draft. Text lengths are bounded.
+
+Every generated or parent-edited draft is checked on the server before it is
+returned or stored. All required safety declarations must be true, and a
+conservative content check rejects explicit unsafe terms. Invalid output is
+not persisted or shown for review; a failed regeneration leaves the previous
+valid draft intact. The parent can edit a valid draft, regenerate it, approve
+it, and then activate it. Editing or regenerating clears approval. Only an
+approved draft can be activated, and an activated draft cannot be changed or
+activated again.
+
+Activation creates a new isolated campaign and writes its settings, bible,
+party, generated locations, recurring NPCs, and adventure hooks as available
+quests in one database transaction. It records a version 1
+`CampaignBibleVersion` snapshot. `GET /api/campaigns/{campaignId}/bible-versions`
+returns the campaign-scoped version history. A discarded or invalid draft
+never creates a playable campaign.
+
+Draft workflow endpoints are `GET /api/campaign-drafts`,
+`POST /api/campaign-briefs/{briefId}/drafts`,
+`GET /api/campaign-drafts/{draftId}`,
+`POST /api/campaign-drafts/{draftId}/regenerate`,
+`PUT /api/campaign-drafts/{draftId}`,
+`POST /api/campaign-drafts/{draftId}/approve`,
+`POST /api/campaign-drafts/{draftId}/activate`, and
+`DELETE /api/campaign-drafts/{draftId}`. The UI only exposes approval and
+activation after parent review; the API also enforces draft validation,
+approval state, and activation idempotency.
+
+Configure generation on the API server with `Storykeeper__Ai__BaseUrl`,
+`Storykeeper__Ai__Model`, and `Storykeeper__Ai__ApiKey`. The base URL is the
+provider's API root (for example, ending in `/v1`); only HTTPS is accepted
+except for loopback development endpoints. `Storykeeper__Ai__TimeoutSeconds`
+sets a 10-180 second request timeout. The key is never returned to the browser.
+Without these settings, brief saving and the rest of the app work normally,
+but requesting generation returns a configuration error.

@@ -7,6 +7,10 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__Storykeeper: Data Source=/data/storykeeper.db
+      Storykeeper__Ai__BaseUrl: ${STORYKEEPER_AI_BASE_URL:-}
+      Storykeeper__Ai__Model: ${STORYKEEPER_AI_MODEL:-}
+      Storykeeper__Ai__ApiKey: ${STORYKEEPER_AI_API_KEY:-}
+      Storykeeper__Ai__TimeoutSeconds: ${STORYKEEPER_AI_TIMEOUT_SECONDS:-60}
     ports:
       - "${API_PORT:-5080}:8080"
     volumes:

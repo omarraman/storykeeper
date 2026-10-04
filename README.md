@@ -32,9 +32,10 @@ npm run dev:web
 
 Open <http://localhost:5173>. The web app proxies `/api` requests to the API at
 <http://localhost:5080>; its status in the header confirms the health check.
-The campaign library can save and edit parent-authored campaign briefs, create
-blank story worlds, and organize campaigns. Reopening a selected world restores
-its server-saved party, quests, and session summaries.
+The campaign library can save and edit parent-authored campaign briefs,
+generate and review child-safe campaign drafts, activate approved drafts as
+isolated story worlds, create blank worlds, and organize campaigns. Reopening a
+selected world restores its server-saved party, quests, and session summaries.
 
 ## Run with Docker Compose
 
@@ -79,8 +80,11 @@ Configuration uses environment variables. ASP.NET Core's standard environment
 configuration provider reads API settings from `ASPNETCORE_*` and other
 environment variables. Do not commit credentials; keep local values in an
 untracked `.env` file or use your deployment platform's secret manager. The
-checked-in `.env.example` contains only non-secret port defaults. The API uses
-SQLite at `storykeeper.db` by default; set `ConnectionStrings__Storykeeper` to
-change its connection string. Docker Compose stores its database in the
-persistent `storykeeper-data` volume. No AI or database credentials are needed
-for this starter.
+checked-in `.env.example` contains non-secret port defaults and blank optional
+AI settings. The API uses SQLite at `storykeeper.db` by default; set
+`ConnectionStrings__Storykeeper` to change its connection string. Docker
+Compose stores its database in the persistent `storykeeper-data` volume.
+Campaign generation requires server-side `Storykeeper__Ai__BaseUrl`,
+`Storykeeper__Ai__Model`, and `Storykeeper__Ai__ApiKey` settings; the key is
+never sent to the browser. Without them, other campaign features remain
+available and generation reports that it is not configured.

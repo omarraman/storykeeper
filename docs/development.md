@@ -17,7 +17,24 @@ example `Data Source=C:\data\storykeeper.db` on Windows or
 The web app's campaign library uses the API to create, list, load, complete,
 archive, and delete story worlds. The selected campaign ID is stored in the
 browser so a refresh can reopen its saved campaign state; campaign data itself
-is persisted by the API in SQLite.
+is persisted by the API in SQLite. Campaign briefs and generated campaign
+drafts are also saved by the API; provider credentials are read only by the
+server and must not be placed in web configuration.
+
+## AI campaign generation
+
+Campaign generation is optional. Configure the API process with
+`Storykeeper__Ai__BaseUrl`, `Storykeeper__Ai__Model`, and
+`Storykeeper__Ai__ApiKey` to use an OpenAI-compatible Chat Completions service.
+The base URL should include any API prefix such as `/v1`. `Storykeeper__Ai__TimeoutSeconds`
+is optional and defaults to 60; valid values are 10-180. Non-loopback
+endpoints must use HTTPS. Store the API key in a server environment or secret
+manager, never in Vite variables or browser storage.
+
+For Docker Compose, set `STORYKEEPER_AI_BASE_URL`, `STORYKEEPER_AI_MODEL`,
+`STORYKEEPER_AI_API_KEY`, and optionally `STORYKEEPER_AI_TIMEOUT_SECONDS` in
+the untracked `.env` file. Generation remains unavailable if the provider
+settings are blank; no key is required to run the rest of the application.
 
 Docker Compose uses the named `storykeeper-data` volume mounted at `/data`,
 which keeps the database when the API container is recreated. Use

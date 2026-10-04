@@ -3,6 +3,7 @@ using Storykeeper.Api.Data;
 using Storykeeper.Api.Contracts;
 using Storykeeper.Api.Domain;
 using Storykeeper.Api.Services;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,6 +15,13 @@ builder.Services.AddScoped<ICampaignRepository, CampaignRepository>();
 builder.Services.AddScoped<ICampaignEntityRepository, CampaignEntityRepository>();
 builder.Services.AddScoped<ICampaignService, CampaignService>();
 builder.Services.AddScoped<ICampaignBriefService, CampaignBriefService>();
+builder.Services.Configure<StorykeeperAiOptions>(builder.Configuration.GetSection("Storykeeper:Ai"));
+builder.Services.AddHttpClient<ICampaignDraftGenerator, OpenAiCompatibleCampaignDraftGenerator>((services, client) =>
+{
+    var options = services.GetRequiredService<IOptions<StorykeeperAiOptions>>().Value;
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds is >= 10 and <= 180 ? options.TimeoutSeconds : 60);
+});
+builder.Services.AddScoped<ICampaignDraftService, CampaignDraftService>();
 
 var app = builder.Build();
 
@@ -53,6 +61,155 @@ app.MapGet("/api/campaign-briefs/{briefId:guid}", async (
 {
     var brief = await briefs.GetAsync(briefId, cancellationToken);
     return brief is null ? Results.NotFound() : Results.Ok(CampaignBriefResponse.From(brief));
+});
+
+app.MapGet("/api/campaign-drafts", async (
+    ICampaignDraftService drafts,
+    CancellationToken cancellationToken) =>
+    Results.Ok((await drafts.ListAsync(cancellationToken)).Select(CampaignDraftResponse.From)));
+
+app.MapPost("/api/campaign-briefs/{briefId:guid}/drafts", async (
+    Guid briefId,
+    ICampaignDraftService drafts,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var draft = await drafts.GenerateAsync(briefId, cancellationToken);
+        return draft is null
+            ? Results.NotFound()
+            : Results.Created($"/api/campaign-drafts/{draft.Id}", CampaignDraftResponse.From(draft));
+    }
+    catch (CampaignDraftGenerationException exception)
+    {
+        return Results.Problem(statusCode: exception.StatusCode, title: "Campaign generation failed", detail: exception.Message);
+    }
+    catch (CampaignDraftRejectedException exception)
+    {
+        return Results.ValidationProblem(exception.Errors, statusCode: 422, title: "Campaign draft rejected", detail: exception.Message);
+    }
+});
+
+app.MapGet("/api/campaign-drafts/{draftId:guid}", async (
+    Guid draftId,
+    ICampaignDraftService drafts,
+    CancellationToken cancellationToken) =>
+{
+    var draft = await drafts.GetAsync(draftId, cancellationToken);
+    return draft is null ? Results.NotFound() : Results.Ok(CampaignDraftResponse.From(draft));
+});
+
+app.MapPost("/api/campaign-drafts/{draftId:guid}/regenerate", async (
+    Guid draftId,
+    ICampaignDraftService drafts,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var result = await drafts.RegenerateAsync(draftId, cancellationToken);
+        return result.Status switch
+        {
+            CampaignDraftOperationStatus.NotFound => Results.NotFound(),
+            CampaignDraftOperationStatus.AlreadyActivated => Results.Problem(
+                statusCode: 409, title: "Draft already activated", detail: "Activated drafts cannot be regenerated."),
+            _ => Results.Ok(CampaignDraftResponse.From(result.Draft!))
+        };
+    }
+    catch (CampaignDraftGenerationException exception)
+    {
+        return Results.Problem(statusCode: exception.StatusCode, title: "Campaign generation failed", detail: exception.Message);
+    }
+    catch (CampaignDraftRejectedException exception)
+    {
+        return Results.ValidationProblem(exception.Errors, statusCode: 422, title: "Campaign draft rejected", detail: exception.Message);
+    }
+});
+
+app.MapPut("/api/campaign-drafts/{draftId:guid}", async (
+    Guid draftId,
+    CampaignDraftContent? content,
+    ICampaignDraftService drafts,
+    CancellationToken cancellationToken) =>
+{
+    var errors = CampaignDraftValidator.Validate(content);
+    if (errors.Count > 0)
+    {
+        return Results.ValidationProblem(errors, statusCode: 422, title: "Campaign draft rejected");
+    }
+
+    var result = await drafts.UpdateAsync(draftId, content!, cancellationToken);
+    return result.Status switch
+    {
+        CampaignDraftOperationStatus.NotFound => Results.NotFound(),
+        CampaignDraftOperationStatus.AlreadyActivated => Results.Problem(
+            statusCode: 409, title: "Draft already activated", detail: "Activated drafts cannot be edited."),
+        _ => Results.Ok(CampaignDraftResponse.From(result.Draft!))
+    };
+});
+
+app.MapPost("/api/campaign-drafts/{draftId:guid}/approve", async (
+    Guid draftId,
+    ICampaignDraftService drafts,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var result = await drafts.ApproveAsync(draftId, cancellationToken);
+        return result.Status switch
+        {
+            CampaignDraftOperationStatus.NotFound => Results.NotFound(),
+            CampaignDraftOperationStatus.AlreadyActivated => Results.Problem(
+                statusCode: 409, title: "Draft already activated", detail: "Activated drafts cannot be re-approved."),
+            _ => Results.Ok(CampaignDraftResponse.From(result.Draft!))
+        };
+    }
+    catch (CampaignDraftRejectedException exception)
+    {
+        return Results.ValidationProblem(exception.Errors, statusCode: 422, title: "Campaign draft rejected", detail: exception.Message);
+    }
+});
+
+app.MapPost("/api/campaign-drafts/{draftId:guid}/activate", async (
+    Guid draftId,
+    ICampaignDraftService drafts,
+    CancellationToken cancellationToken) =>
+{
+    var result = await drafts.ActivateAsync(draftId, cancellationToken);
+    return result.Status switch
+    {
+        CampaignDraftActivationStatus.NotFound => Results.NotFound(),
+        CampaignDraftActivationStatus.ApprovalRequired => Results.Problem(
+            statusCode: 409, title: "Approval required", detail: "A parent must approve the draft before activation."),
+        CampaignDraftActivationStatus.AlreadyActivated => Results.Problem(
+            statusCode: 409, title: "Draft already activated", detail: "This draft has already created a story world."),
+        _ => Results.Created($"/api/campaigns/{result.Campaign!.Id}", CampaignResponse.From(result.Campaign))
+    };
+});
+
+app.MapDelete("/api/campaign-drafts/{draftId:guid}", async (
+    Guid draftId,
+    ICampaignDraftService drafts,
+    CancellationToken cancellationToken) =>
+{
+    var result = await drafts.DeleteAsync(draftId, cancellationToken);
+    return result.Status switch
+    {
+        CampaignDraftOperationStatus.NotFound => Results.NotFound(),
+        CampaignDraftOperationStatus.AlreadyActivated => Results.Problem(
+            statusCode: 409, title: "Draft already activated", detail: "Activated drafts cannot be discarded."),
+        _ => Results.NoContent()
+    };
+});
+
+app.MapGet("/api/campaigns/{campaignId:guid}/bible-versions", async (
+    Guid campaignId,
+    ICampaignDraftService drafts,
+    CancellationToken cancellationToken) =>
+{
+    var versions = await drafts.ListBibleVersionsAsync(campaignId, cancellationToken);
+    return versions is null
+        ? Results.NotFound()
+        : Results.Ok(versions.Select(CampaignBibleVersionResponse.From));
 });
 
 app.MapPut("/api/campaign-briefs/{briefId:guid}", async (
