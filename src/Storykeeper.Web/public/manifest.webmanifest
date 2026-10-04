@@ -1,0 +1,17 @@
+{
+  "name": "Storykeeper",
+  "short_name": "Storykeeper",
+  "description": "A family-friendly home for imaginative tabletop adventures.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f5ec",
+  "theme_color": "#f8f5ec",
+  "icons": [
+    {
+      "src": "/storykeeper.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

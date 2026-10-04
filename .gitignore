@@ -1,0 +1,19 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+**/appsettings.*.local.json
+
+# Dependencies and build output
+node_modules/
+**/bin/
+**/obj/
+**/dist/
+**/coverage/
+
+# IDE and OS files
+.idea/
+.vscode/
+.DS_Store
+*.user
+*.suo

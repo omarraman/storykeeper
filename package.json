@@ -1,0 +1,12 @@
+{
+  "name": "storykeeper",
+  "private": true,
+  "workspaces": [
+    "src/Storykeeper.Web"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace @storykeeper/web -- --host 0.0.0.0",
+    "dev:api": "dotnet watch --project src/Storykeeper.Api/Storykeeper.Api.csproj run --urls http://localhost:5080",
+    "build": "npm run build --workspace @storykeeper/web && dotnet build Storykeeper.slnx"
+  }
+}
