@@ -1,0 +1,21 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: src/Storykeeper.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+    ports:
+      - "${API_PORT:-5080}:8080"
+
+  web:
+    build:
+      context: .
+      dockerfile: src/Storykeeper.Web/Dockerfile
+    depends_on:
+      - api
+    environment:
+      VITE_API_PROXY_TARGET: http://api:8080
+    ports:
+      - "${WEB_PORT:-5173}:5173"
