@@ -14,6 +14,7 @@ builder.Services.AddDbContext<StorykeeperDbContext>(options => options.UseSqlite
 builder.Services.AddScoped<ICampaignRepository, CampaignRepository>();
 builder.Services.AddScoped<ICampaignEntityRepository, CampaignEntityRepository>();
 builder.Services.AddScoped<ICampaignService, CampaignService>();
+builder.Services.AddScoped<IGameRulesService, GameRulesService>();
 builder.Services.AddScoped<ICampaignBriefService, CampaignBriefService>();
 builder.Services.Configure<StorykeeperAiOptions>(builder.Configuration.GetSection("Storykeeper:Ai"));
 builder.Services.AddHttpClient<ICampaignDraftGenerator, OpenAiCompatibleCampaignDraftGenerator>((services, client) =>
@@ -35,6 +36,108 @@ app.MapGet("/api/health", () => Results.Ok(new { status = "Healthy" }));
 
 app.MapGet("/api/campaigns", async (ICampaignService campaigns, CancellationToken cancellationToken) =>
     Results.Ok((await campaigns.ListAsync(cancellationToken)).Select(CampaignResponse.From)));
+
+app.MapPost("/api/campaigns/{campaignId:guid}/sessions", async (
+    Guid campaignId,
+    IGameRulesService rules,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var result = await rules.StartSessionAsync(campaignId, cancellationToken);
+        return result.Session is null
+            ? Results.NotFound()
+            : Results.Ok(SessionStartResponse.From(result.Session, result.Heroes));
+    }
+    catch (RuleConflictException exception)
+    {
+        return Results.Problem(statusCode: 409, title: "Session cannot be started", detail: exception.Message);
+    }
+});
+
+app.MapPost("/api/campaigns/{campaignId:guid}/sessions/{sessionId:guid}/heroes/{heroId:guid}/checks", async (
+    Guid campaignId,
+    Guid sessionId,
+    Guid heroId,
+    CheckRequest? request,
+    IGameRulesService rules,
+    CancellationToken cancellationToken) =>
+{
+    var errors = CheckRequestValidator.Validate(request);
+    if (errors.Count > 0)
+    {
+        return Results.ValidationProblem(errors);
+    }
+
+    try
+    {
+        var resolution = await rules.ResolveCheckAsync(
+            campaignId,
+            sessionId,
+            heroId,
+            request!.Roll,
+            request.Difficulty,
+            request.Strength,
+            request.SpendSparkleToken,
+            request.Risky,
+            cancellationToken);
+        return resolution is null
+            ? Results.NotFound()
+            : Results.Ok(CheckResolutionResponse.From(resolution));
+    }
+    catch (RuleValidationException exception)
+    {
+        return Results.ValidationProblem(
+            new Dictionary<string, string[]> { ["check"] = [exception.Message] });
+    }
+    catch (RuleConflictException exception)
+    {
+        return Results.Problem(statusCode: 409, title: "Check cannot be resolved", detail: exception.Message);
+    }
+});
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapPost("/api/campaigns/{campaignId:guid}/sessions/{sessionId:guid}/heroes/{heroId:guid}/checks/test", async (
+        Guid campaignId,
+        Guid sessionId,
+        Guid heroId,
+        TestCheckRequest? request,
+        IGameRulesService rules,
+        CancellationToken cancellationToken) =>
+    {
+        var errors = CheckRequestValidator.Validate(request);
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
+        try
+        {
+            var resolution = await rules.ResolveTestCheckAsync(
+                campaignId,
+                sessionId,
+                heroId,
+                request!.Difficulty,
+                request.Strength,
+                request.SpendSparkleToken,
+                request.Risky,
+                cancellationToken);
+            return resolution is null
+                ? Results.NotFound()
+                : Results.Ok(CheckResolutionResponse.From(resolution));
+        }
+        catch (RuleValidationException exception)
+        {
+            return Results.ValidationProblem(
+                new Dictionary<string, string[]> { ["check"] = [exception.Message] });
+        }
+        catch (RuleConflictException exception)
+        {
+            return Results.Problem(statusCode: 409, title: "Check cannot be resolved", detail: exception.Message);
+        }
+    });
+}
 
 app.MapGet("/api/campaign-briefs", async (ICampaignBriefService briefs, CancellationToken cancellationToken) =>
     Results.Ok((await briefs.ListAsync(cancellationToken)).Select(CampaignBriefResponse.From)));

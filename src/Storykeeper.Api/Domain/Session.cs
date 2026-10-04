@@ -7,4 +7,5 @@ public sealed class Session : CampaignEntity
     public DateTimeOffset? EndedAtUtc { get; set; }
     public string? Summary { get; set; }
     public ICollection<CampaignFact> Facts { get; set; } = new List<CampaignFact>();
+    public ICollection<CheckResolution> CheckResolutions { get; set; } = new List<CheckResolution>();
 }

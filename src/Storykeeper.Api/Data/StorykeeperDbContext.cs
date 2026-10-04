@@ -26,6 +26,7 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
     public DbSet<Npc> Npcs => Set<Npc>();
     public DbSet<Quest> Quests => Set<Quest>();
     public DbSet<Session> Sessions => Set<Session>();
+    public DbSet<CheckResolution> CheckResolutions => Set<CheckResolution>();
     public DbSet<CampaignFact> CampaignFacts => Set<CampaignFact>();
     public DbSet<Relationship> Relationships => Set<Relationship>();
     public DbSet<Reward> Rewards => Set<Reward>();
@@ -110,6 +111,11 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
             entity.Property(hero => hero.Name).HasMaxLength(120).IsRequired();
             entity.Property(hero => hero.Description).HasMaxLength(2000).IsRequired();
             entity.Property(hero => hero.Role).HasMaxLength(80).IsRequired();
+            entity.Property(hero => hero.Strengths)
+                .HasConversion(values => JsonSerializer.Serialize(values, (JsonSerializerOptions?)null),
+                    value => JsonSerializer.Deserialize<List<string>>(value, (JsonSerializerOptions?)null) ?? new List<string>())
+                .HasDefaultValueSql("'[]'")
+                .Metadata.SetValueComparer(StringListComparer);
             entity.HasAlternateKey(hero => new { hero.CampaignId, hero.Id });
             entity.HasOne<Party>()
                 .WithMany(party => party.Heroes)
@@ -155,6 +161,25 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
             entity.HasIndex(session => new { session.CampaignId, session.SessionNumber }).IsUnique();
             entity.HasAlternateKey(session => new { session.CampaignId, session.Id });
         }, campaignNavigation: campaign => campaign.Sessions);
+        ConfigureCampaignEntity<CheckResolution>(modelBuilder, entity =>
+        {
+            entity.Property(check => check.Strength).HasMaxLength(80);
+            entity.HasOne<Session>()
+                .WithMany(session => session.CheckResolutions)
+                .HasForeignKey(check => new { check.CampaignId, check.SessionId })
+                .HasPrincipalKey(session => new { session.CampaignId, session.Id })
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Hero>()
+                .WithMany()
+                .HasForeignKey(check => new { check.CampaignId, check.HeroId })
+                .HasPrincipalKey(hero => new { hero.CampaignId, hero.Id })
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.ToTable(table =>
+            {
+                table.HasCheckConstraint("CK_CheckResolutions_Roll", "Roll BETWEEN 1 AND 20");
+                table.HasCheckConstraint("CK_CheckResolutions_Target", "Target IN (8, 12, 16)");
+            });
+        });
         ConfigureCampaignEntity<CampaignFact>(modelBuilder, entity =>
         {
             entity.Property(fact => fact.Category).HasMaxLength(80).IsRequired();

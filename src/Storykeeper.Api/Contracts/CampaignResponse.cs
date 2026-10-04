@@ -67,6 +67,7 @@ public sealed record HeroResponse(
     string Name,
     string Description,
     string Role,
+    IReadOnlyList<string> Strengths,
     int Hearts,
     int SparkleTokens,
     IReadOnlyList<InventoryItemResponse> Inventory)
@@ -76,6 +77,7 @@ public sealed record HeroResponse(
         hero.Name,
         hero.Description,
         hero.Role,
+        hero.Strengths.ToArray(),
         hero.Hearts,
         hero.SparkleTokens,
         hero.Inventory

@@ -23,6 +23,8 @@ Current implementation focus:
 - Tablet-friendly campaign library with create, list, complete, archive,
   delete, and saved campaign resume.
 - Reusable campaign/domain model with SQLite persistence and campaign isolation.
+- Server-authoritative, child-friendly d20 checks with session hearts, sparkle
+  tokens, and forward-progress outcomes.
 - Text-first, tablet-first play before optional voice interaction.
 
 ## Core principles
@@ -43,7 +45,7 @@ Current implementation focus:
 | [Development guide](docs/development.md) | Setup, run, test, configuration, and deployment guidance | Available |
 | [Architecture](docs/architecture.md) | Web PWA, API, persistence, and AI integration boundaries | Available |
 | [Domain model](docs/domain-model.md) | Campaigns, heroes, NPCs, facts, quests, sessions, and inventory | Available |
-| [Game rules](docs/game-rules.md) | Child-friendly d20 rules, hearts, sparkle tokens, and consequences | Planned |
+| [Game rules](docs/game-rules.md) | Child-friendly d20 rules, hearts, sparkle tokens, and consequences | Available |
 | [Campaign generation](docs/campaign-generation.md) | CampaignBrief wizard, validated generation, approval, activation, and bible versions | Available |
 | [AI Storykeeper](docs/ai-storykeeper.md) | Prompting, schemas, tools, turn processing, validation, and continuity | Planned |
 | [Safety and parent controls](docs/safety-and-parent-controls.md) | Safety defaults, settings, parent PIN, pacing, and overrides | Planned |

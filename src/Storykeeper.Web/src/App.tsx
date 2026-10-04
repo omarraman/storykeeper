@@ -109,6 +109,7 @@ type Hero = {
   name: string
   description: string
   role: string
+  strengths: string[]
   hearts: number
   sparkleTokens: number
   inventory: { name: string; description: string; quantity: number }[]

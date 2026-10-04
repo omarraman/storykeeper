@@ -18,14 +18,20 @@ campaign's party, hero, location, or session.
 - `CampaignBible` stores durable world description, current situation, and
   current version number.
 - `Party` groups the campaign's `Hero` records. Heroes track description,
-  role, hearts, sparkle tokens, and their inventory.
+  role, listed strengths, current-session hearts and sparkle tokens, and their
+  inventory.
 - `InventoryItem` belongs to one hero and stores its name, description, and
   quantity.
 - `Location` and `Npc` store campaign-scoped world details. An NPC may
   reference a location in the same campaign.
 - `Quest` stores its title, description, and lifecycle status.
 - `Session` stores its sequence number, UTC start/end times, and optional
-  summary.
+  summary. Starting a session resets each hero to 3 hearts and 1 sparkle
+  token.
+- `CheckResolution` records a server-calculated d20 result, its session and
+  hero, the difficulty and bonuses, the outcome band, the forward-progress
+  requirement, and before/after heart and sparkle-token counts. Composite
+  foreign keys keep both the hero and session within the owning campaign.
 - `CampaignFact` stores a durable statement, category, status, importance
   from 1 to 5, and an optional source session from the same campaign.
 - `Relationship` stores a campaign-scoped relationship between typed hero or

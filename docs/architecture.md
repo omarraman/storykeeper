@@ -24,6 +24,15 @@ with `POST /api/campaigns/{id}/complete`, archives them with
 The selected campaign ID is a browser preference in local storage; campaign
 facts and saved story state remain server-side in SQLite.
 
+The game-rules service owns session resource resets and check resolution.
+`POST /api/campaigns/{id}/sessions` starts a session and resets heroes to 3
+hearts and 1 sparkle token. Checks are submitted to
+`POST /api/campaigns/{id}/sessions/{sessionId}/heroes/{heroId}/checks`; the API
+validates campaign, session, hero, strength, and token state, computes and
+records the result in one transaction, and returns typed, child-readable
+outcome data. The browser supplies the physical d20 value but does not
+calculate or persist the outcome.
+
 Campaign-generation inputs are saved as independent `CampaignBrief` drafts
 through `/api/campaign-briefs`. The API supports list, create, read, update,
 and delete operations with server-side request validation and server-owned
@@ -57,6 +66,8 @@ snapshot. The browser cannot directly persist generated campaign state.
 
 Live gameplay narration is not implemented. Campaign facts remain durable,
 structured records distinct from session summaries or generated narration.
+The server-side d20 rules engine is implemented; AI may narrate its results but
+must not alter a roll, bonus, difficulty, heart, token, or saved rule state.
 Future AI features must propose schema-validated changes through server-side
 logic; AI output must not directly persist game state or determine rules or
 dice outcomes.
