@@ -1,0 +1,154 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Storykeeper.Api.Domain;
+
+namespace Storykeeper.Api.Data;
+
+public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> options) : DbContext(options)
+{
+    public DbSet<Campaign> Campaigns => Set<Campaign>();
+    public DbSet<CampaignSettings> CampaignSettings => Set<CampaignSettings>();
+    public DbSet<CampaignBible> CampaignBibles => Set<CampaignBible>();
+    public DbSet<Party> Parties => Set<Party>();
+    public DbSet<Hero> Heroes => Set<Hero>();
+    public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();
+    public DbSet<Location> Locations => Set<Location>();
+    public DbSet<Npc> Npcs => Set<Npc>();
+    public DbSet<Quest> Quests => Set<Quest>();
+    public DbSet<Session> Sessions => Set<Session>();
+    public DbSet<CampaignFact> CampaignFacts => Set<CampaignFact>();
+    public DbSet<Relationship> Relationships => Set<Relationship>();
+    public DbSet<Reward> Rewards => Set<Reward>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Campaign>(entity =>
+        {
+            entity.HasKey(campaign => campaign.Id);
+            entity.Property(campaign => campaign.Name).HasMaxLength(120).IsRequired();
+            entity.Property(campaign => campaign.Description).HasMaxLength(2000);
+
+            entity.HasOne(campaign => campaign.Settings)
+                .WithOne()
+                .HasForeignKey<CampaignSettings>(settings => settings.CampaignId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(campaign => campaign.Bible)
+                .WithOne()
+                .HasForeignKey<CampaignBible>(bible => bible.CampaignId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(campaign => campaign.Party)
+                .WithOne()
+                .HasForeignKey<Party>(party => party.CampaignId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        ConfigureCampaignEntity<CampaignSettings>(modelBuilder, entity =>
+        {
+            entity.Property(settings => settings.Theme).HasMaxLength(100).IsRequired();
+            entity.Property(settings => settings.Tone).HasMaxLength(300).IsRequired();
+        }, configureCampaignRelationship: false);
+        ConfigureCampaignEntity<CampaignBible>(modelBuilder, entity =>
+        {
+            entity.Property(bible => bible.WorldDescription).HasMaxLength(4000).IsRequired();
+            entity.Property(bible => bible.CurrentSituation).HasMaxLength(2000);
+        }, configureCampaignRelationship: false);
+        ConfigureCampaignEntity<Party>(modelBuilder, entity =>
+        {
+            entity.Property(party => party.Name).HasMaxLength(120).IsRequired();
+            entity.HasAlternateKey(party => new { party.CampaignId, party.Id });
+        }, configureCampaignRelationship: false);
+        ConfigureCampaignEntity<Hero>(modelBuilder, entity =>
+        {
+            entity.Property(hero => hero.Name).HasMaxLength(120).IsRequired();
+            entity.Property(hero => hero.Description).HasMaxLength(2000).IsRequired();
+            entity.Property(hero => hero.Role).HasMaxLength(80).IsRequired();
+            entity.HasAlternateKey(hero => new { hero.CampaignId, hero.Id });
+            entity.HasOne<Party>()
+                .WithMany(party => party.Heroes)
+                .HasForeignKey(hero => new { hero.CampaignId, hero.PartyId })
+                .HasPrincipalKey(party => new { party.CampaignId, party.Id })
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+        ConfigureCampaignEntity<InventoryItem>(modelBuilder, entity =>
+        {
+            entity.Property(item => item.Name).HasMaxLength(120).IsRequired();
+            entity.Property(item => item.Description).HasMaxLength(1000).IsRequired();
+            entity.HasOne<Hero>()
+                .WithMany(hero => hero.Inventory)
+                .HasForeignKey(item => new { item.CampaignId, item.HeroId })
+                .HasPrincipalKey(hero => new { hero.CampaignId, hero.Id })
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+        ConfigureCampaignEntity<Location>(modelBuilder, entity =>
+        {
+            entity.Property(location => location.Name).HasMaxLength(120).IsRequired();
+            entity.Property(location => location.Description).HasMaxLength(2000).IsRequired();
+            entity.HasAlternateKey(location => new { location.CampaignId, location.Id });
+        });
+        ConfigureCampaignEntity<Npc>(modelBuilder, entity =>
+        {
+            entity.Property(npc => npc.Name).HasMaxLength(120).IsRequired();
+            entity.Property(npc => npc.Description).HasMaxLength(2000).IsRequired();
+            entity.Property(npc => npc.Disposition).HasMaxLength(300).IsRequired();
+            entity.HasOne<Location>()
+                .WithMany()
+                .HasForeignKey(npc => new { npc.CampaignId, npc.LocationId })
+                .HasPrincipalKey(location => new { location.CampaignId, location.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        ConfigureCampaignEntity<Quest>(modelBuilder, entity =>
+        {
+            entity.Property(quest => quest.Title).HasMaxLength(160).IsRequired();
+            entity.Property(quest => quest.Description).HasMaxLength(2000).IsRequired();
+        });
+        ConfigureCampaignEntity<Session>(modelBuilder, entity =>
+        {
+            entity.Property(session => session.Summary).HasMaxLength(4000);
+            entity.HasIndex(session => new { session.CampaignId, session.SessionNumber }).IsUnique();
+            entity.HasAlternateKey(session => new { session.CampaignId, session.Id });
+        });
+        ConfigureCampaignEntity<CampaignFact>(modelBuilder, entity =>
+        {
+            entity.Property(fact => fact.Category).HasMaxLength(80).IsRequired();
+            entity.Property(fact => fact.Statement).HasMaxLength(2000).IsRequired();
+            entity.ToTable(table => table.HasCheckConstraint("CK_CampaignFacts_Importance", "Importance BETWEEN 1 AND 5"));
+            entity.HasOne<Session>()
+                .WithMany(session => session.Facts)
+                .HasForeignKey(fact => new { fact.CampaignId, fact.SourceSessionId })
+                .HasPrincipalKey(session => new { session.CampaignId, session.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        ConfigureCampaignEntity<Relationship>(modelBuilder, entity =>
+        {
+            entity.Property(relationship => relationship.Description).HasMaxLength(1000).IsRequired();
+        });
+        ConfigureCampaignEntity<Reward>(modelBuilder, entity =>
+        {
+            entity.Property(reward => reward.Name).HasMaxLength(120).IsRequired();
+            entity.Property(reward => reward.Description).HasMaxLength(1000).IsRequired();
+            entity.HasOne<Hero>()
+                .WithMany()
+                .HasForeignKey(reward => new { reward.CampaignId, reward.HeroId })
+                .HasPrincipalKey(hero => new { hero.CampaignId, hero.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureCampaignEntity<TEntity>(
+        ModelBuilder modelBuilder,
+        Action<EntityTypeBuilder<TEntity>> configure,
+        bool configureCampaignRelationship = true)
+        where TEntity : CampaignEntity
+    {
+        var entity = modelBuilder.Entity<TEntity>();
+        entity.HasKey(item => item.Id);
+        if (configureCampaignRelationship)
+        {
+            entity.HasOne<Campaign>()
+                .WithMany()
+                .HasForeignKey(item => item.CampaignId)
+                .OnDelete(DeleteBehavior.Cascade);
+        }
+        configure(entity);
+    }
+}

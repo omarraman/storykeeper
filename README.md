@@ -55,6 +55,12 @@ Build both projects:
 npm run build
 ```
 
+Run the API persistence tests:
+
+```sh
+dotnet test Storykeeper.slnx
+```
+
 With the API running locally or through Compose, check its health endpoint:
 
 ```sh
@@ -70,5 +76,8 @@ Configuration uses environment variables. ASP.NET Core's standard environment
 configuration provider reads API settings from `ASPNETCORE_*` and other
 environment variables. Do not commit credentials; keep local values in an
 untracked `.env` file or use your deployment platform's secret manager. The
-checked-in `.env.example` contains only non-secret port defaults. No AI or
-database credentials are needed for this starter.
+checked-in `.env.example` contains only non-secret port defaults. The API uses
+SQLite at `storykeeper.db` by default; set `ConnectionStrings__Storykeeper` to
+change its connection string. Docker Compose stores its database in the
+persistent `storykeeper-data` volume. No AI or database credentials are needed
+for this starter.
