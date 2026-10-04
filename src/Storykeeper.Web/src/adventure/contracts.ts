@@ -9,6 +9,7 @@ export interface StoryBeat {
   id: string
   narration: string
   speaker: string | null
+  npcDialogue?: { npcName: string; text: string }[]
   suggestedChoices: SuggestedChoice[]
 }
 
@@ -46,6 +47,7 @@ export interface ClueSummary {
 }
 
 export interface CheckResolutionSummary {
+  id?: string
   roll: number
   total: number | null
   target: number | null
@@ -101,6 +103,7 @@ export interface SessionStartResponse {
 }
 
 export interface CheckResolutionResponse {
+  id?: string
   roll: number
   total: number
   target: number

@@ -193,6 +193,11 @@ export function AdventurePlayScreen({
           <p className="card-kicker" id="scene-heading">THE STORY SO FAR</p>
           {storyBeat.speaker && <p className="adventure-speaker">{storyBeat.speaker}</p>}
           <p className="adventure-narration" aria-live="polite">{storyBeat.narration}</p>
+          {storyBeat.npcDialogue?.map((line, index) => (
+            <p className="adventure-speaker" key={`${line.npcName}-${index}`}>
+              <strong>{line.npcName}:</strong> {line.text}
+            </p>
+          ))}
           {turn.type === 'story_beat' && turn.checkResolution && (
             <div className={`check-result ${turn.checkResolution.source === 'preview' ? 'demo-result' : ''}`} role="status">
               <strong>{turn.checkResolution.source === 'preview' ? `Preview die: ${turn.checkResolution.roll}` : `${turn.checkResolution.outcome} · ${turn.checkResolution.total}`}</strong>

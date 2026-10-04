@@ -131,6 +131,7 @@ export class DemoAdventureTurnClient implements AdventureTurnClient {
 
     const source: CheckResolutionSummary['source'] = hero ? 'server' : 'preview'
     const checkResolution = {
+      id: result.id,
       roll: result.roll,
       total: hero ? result.total : null,
       target: hero ? result.target : null,

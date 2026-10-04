@@ -23,7 +23,7 @@ Current implementation focus:
 - Tablet-friendly campaign library with create, list, complete, archive,
   delete, and saved campaign resume.
 - Tablet landscape adventure-play screen with suggested and free-text actions,
-  physical-d20 entry, and a replaceable deterministic demo turn client.
+  physical-d20 entry, and server-backed AI narration for playable campaigns.
 - Reusable campaign/domain model with SQLite persistence and campaign isolation.
 - Server-authoritative, child-friendly d20 checks with session hearts, sparkle
   tokens, and forward-progress outcomes.
@@ -50,7 +50,7 @@ Current implementation focus:
 | [Game rules](docs/game-rules.md) | Child-friendly d20 rules, hearts, sparkle tokens, and consequences | Available |
 | [Adventure play](docs/adventure-play.md) | Play screen, typed turn-client boundary, demo adapter, and authoritative roll integration | Available |
 | [Campaign generation](docs/campaign-generation.md) | CampaignBrief wizard, validated generation, approval, activation, and bible versions | Available |
-| [AI Storykeeper](docs/ai-storykeeper.md) | Prompting, schemas, tools, turn processing, validation, and continuity | Planned |
+| [AI Storykeeper](docs/ai-storykeeper.md) | Prompting, schemas, turn processing, validation, and continuity | Available |
 | [Safety and parent controls](docs/safety-and-parent-controls.md) | Safety defaults, settings, parent PIN, pacing, and overrides | Planned |
 | [ADR directory](docs/decisions/) | Long-lived architecture decisions and their rationale | Planned |
 

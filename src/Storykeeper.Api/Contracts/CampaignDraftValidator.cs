@@ -99,7 +99,7 @@ public static class CampaignDraftValidator
         }
 
         var text = GetText(content);
-        if (UnsafeContent.IsMatch(text) || MandatoryCombat.IsMatch(text))
+        if (!IsSafeGeneratedText(text))
         {
             errors["safety"] = ["The draft includes content outside Storykeeper's child-safety boundaries."];
         }
@@ -129,6 +129,9 @@ public static class CampaignDraftValidator
             hook!.Title!.Trim(),
             hook.Description!.Trim())).ToArray(),
         content.Safety);
+
+    public static bool IsSafeGeneratedText(string text) =>
+        !UnsafeContent.IsMatch(text) && !MandatoryCombat.IsMatch(text);
 
     private static void ValidateText(IDictionary<string, string[]> errors, string field, string? value, int maxLength)
     {

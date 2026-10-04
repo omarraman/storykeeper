@@ -11,15 +11,11 @@ the player and submitted to the server rules API.
 React consumes the typed `AdventureTurnClient` interface and the
 `AdventureTurnResponse` discriminated union (`story_beat`, `roll_required`, or
 `error`). The view depends on shared story, hero, quest, clue, inventory, and
-roll-resolution summaries—not on fixture-specific properties. The deterministic
-`DemoAdventureTurnClient` currently provides a local sample scene and clues;
-the app registers the client separately from the screen. Replacing the adapter
-with an HTTP turn client must not require changes to the screen components.
-
-Live AI narration, prompt construction, provider calls, and proposed campaign
-state changes are not implemented here. Those remain in the server-side AI
-turn API scope. The browser never receives provider credentials and never
-persists AI-proposed state.
+roll-resolution summaries—not on fixture-specific properties. For campaigns
+with server-owned heroes, submitted suggested or free-text actions use the
+server AI turn API. Empty-world preview campaigns continue using the local
+deterministic demo adapter. The browser never receives provider credentials
+and never persists AI-proposed state.
 
 ## Authoritative session and roll state
 
@@ -43,8 +39,8 @@ reopened. They are not campaign continuity.
 
 Network errors resolving a real check are not blindly retried, because the
 server may have committed the check before a connection failed. The recovery
-action reloads saved campaign state instead. Retry is offered for the
-idempotent demo story action. The screen uses keyboard-operable controls,
+action reloads saved campaign state instead. Retry is offered for recoverable
+story API errors. The screen uses keyboard-operable controls,
 visible focus, labels and live status/error announcements, and keeps the
 suggested-choice count capped at four. On narrow displays the panels reflow and
 remain available through normal page scrolling; on tablet landscape the

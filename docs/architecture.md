@@ -74,10 +74,10 @@ transaction. It creates a new isolated campaign with generated settings,
 campaign bible, locations, NPCs, and quests, and stores a versioned bible
 snapshot. The browser cannot directly persist generated campaign state.
 
-Live AI gameplay narration is not implemented. Campaign facts remain durable,
-structured records distinct from session summaries or generated narration.
-The server-side d20 rules engine is implemented; AI may narrate its results but
-must not alter a roll, bonus, difficulty, heart, token, or saved rule state.
-Future AI features must propose schema-validated changes through server-side
-logic; AI output must not directly persist game state or determine rules or
-dice outcomes.
+Live gameplay narration uses the server-side
+`POST /api/campaigns/{campaignId}/actions` endpoint, detailed in
+[AI Storykeeper](ai-storykeeper.md). The API loads a campaign-scoped context
+and validates strict structured output before it is returned or applied.
+Validated fact proposals are persisted as proposed facts by server-side logic;
+AI output cannot write state directly or change quest status, hero resources,
+rules, or dice outcomes. The server-side d20 rules engine remains authoritative.

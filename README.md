@@ -84,7 +84,8 @@ checked-in `.env.example` contains non-secret port defaults and blank optional
 AI settings. The API uses SQLite at `storykeeper.db` by default; set
 `ConnectionStrings__Storykeeper` to change its connection string. Docker
 Compose stores its database in the persistent `storykeeper-data` volume.
-Campaign generation requires server-side `Storykeeper__Ai__BaseUrl`,
-`Storykeeper__Ai__Model`, and `Storykeeper__Ai__ApiKey` settings; the key is
-never sent to the browser. Without them, other campaign features remain
-available and generation reports that it is not configured.
+Campaign generation and live story narration use server-side
+`Storykeeper__Ai__BaseUrl`, `Storykeeper__Ai__Model`, and
+`Storykeeper__Ai__ApiKey` settings; the key is never sent to the browser.
+Without them, other campaign features remain available while AI features
+return a safe configuration error.

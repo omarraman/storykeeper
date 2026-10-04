@@ -23,6 +23,12 @@ builder.Services.AddHttpClient<ICampaignDraftGenerator, OpenAiCompatibleCampaign
     client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds is >= 10 and <= 180 ? options.TimeoutSeconds : 60);
 });
 builder.Services.AddScoped<ICampaignDraftService, CampaignDraftService>();
+builder.Services.AddHttpClient<IStoryTurnGenerator, OpenAiCompatibleStoryTurnGenerator>((services, client) =>
+{
+    var options = services.GetRequiredService<IOptions<StorykeeperAiOptions>>().Value;
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds is >= 10 and <= 180 ? options.TimeoutSeconds : 60);
+});
+builder.Services.AddScoped<IStoryTurnService, StoryTurnService>();
 
 var app = builder.Build();
 
@@ -36,6 +42,43 @@ app.MapGet("/api/health", () => Results.Ok(new { status = "Healthy" }));
 
 app.MapGet("/api/campaigns", async (ICampaignService campaigns, CancellationToken cancellationToken) =>
     Results.Ok((await campaigns.ListAsync(cancellationToken)).Select(CampaignResponse.From)));
+
+app.MapPost("/api/campaigns/{campaignId:guid}/actions", async (
+    Guid campaignId,
+    StoryTurnRequest? request,
+    IStoryTurnService storyTurns,
+    CancellationToken cancellationToken) =>
+{
+    var errors = StoryTurnRequestValidator.Validate(request);
+    if (errors.Count > 0)
+    {
+        return Results.ValidationProblem(errors);
+    }
+
+    try
+    {
+        var result = await storyTurns.SubmitActionAsync(campaignId, request!, cancellationToken);
+        return result is null ? Results.NotFound() : Results.Ok(result);
+    }
+    catch (RuleValidationException exception)
+    {
+        return Results.ValidationProblem(
+            new Dictionary<string, string[]> { ["action"] = [exception.Message] });
+    }
+    catch (RuleConflictException exception)
+    {
+        return Results.Problem(statusCode: 409, title: "Story action cannot be submitted", detail: exception.Message);
+    }
+    catch (StoryTurnGenerationException exception)
+    {
+        return Results.Json(new
+        {
+            type = "error",
+            message = exception.SafeMessage,
+            retryable = true
+        }, statusCode: exception.StatusCode);
+    }
+});
 
 app.MapPost("/api/campaigns/{campaignId:guid}/sessions", async (
     Guid campaignId,
