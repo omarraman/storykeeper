@@ -1,4 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
+import { request } from './api/request'
+import { AdventurePlayScreen } from './adventure/AdventurePlayScreen'
+import { adventureTurnClient } from './adventure/client'
+import type { AdventureCampaign, SessionStartResponse } from './adventure/contracts'
 import './App.css'
 
 type ApiStatus = 'checking' | 'connected' | 'unavailable'
@@ -127,30 +131,13 @@ type Session = {
 const selectedCampaignKey = 'storykeeper.selectedCampaignId'
 const tabs: CampaignTab[] = ['Active', 'Completed', 'Archived']
 
-async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
-  })
-
-  if (!response.ok) {
-    const details = await response.json().catch(() => null) as { title?: string; detail?: string; errors?: Record<string, string[]> } | null
-    const message = details?.errors
-      ? Object.values(details.errors).flat().join(' ')
-      : details?.detail ?? details?.title ?? `The story server returned ${response.status}.`
-    throw new Error(message)
-  }
-
-  if (response.status === 204) return undefined as T
-  return response.json() as Promise<T>
-}
-
 function App() {
   const [apiStatus, setApiStatus] = useState<ApiStatus>('checking')
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [briefs, setBriefs] = useState<CampaignBrief[]>([])
   const [drafts, setDrafts] = useState<CampaignDraft[]>([])
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null)
+  const [playingAdventure, setPlayingAdventure] = useState(false)
   const [selectedDraft, setSelectedDraft] = useState<CampaignDraft | null>(null)
   const [draftForm, setDraftForm] = useState<CampaignDraftContent | null>(null)
   const [editingDraft, setEditingDraft] = useState(false)
@@ -233,6 +220,7 @@ function App() {
 
   const selectCampaign = (campaign: Campaign) => {
     setSelectedCampaign(campaign)
+    setPlayingAdventure(false)
     setSelectedDraft(null)
     setEditingDraft(false)
     localStorage.setItem(selectedCampaignKey, campaign.id)
@@ -513,6 +501,59 @@ function App() {
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : `Could not ${label} this story world.`)
     }
+  }
+
+  const startOrResumeAdventure = async () => {
+    if (!selectedCampaign || selectedCampaign.status !== 'Active') return
+    setSaving(true)
+    setError('')
+    try {
+      let campaign = await request<Campaign>(`/api/campaigns/${encodeURIComponent(selectedCampaign.id)}`)
+      if (campaign.status !== 'Active') {
+        throw new Error('Only active story worlds can start or resume an adventure.')
+      }
+      if (!campaign.latestSession || campaign.latestSession.endedAtUtc !== null) {
+        const session = await request<SessionStartResponse>(`/api/campaigns/${encodeURIComponent(campaign.id)}/sessions`, { method: 'POST' })
+        campaign = {
+          ...campaign,
+          latestSession: {
+            id: session.id,
+            sessionNumber: session.sessionNumber,
+            startedAtUtc: session.startedAtUtc,
+            endedAtUtc: null,
+            summary: null,
+          },
+          heroes: campaign.heroes.map((hero) => {
+            const sessionHero = session.heroes.find((item) => item.heroId === hero.id)
+            return sessionHero
+              ? { ...hero, hearts: sessionHero.hearts, sparkleTokens: sessionHero.sparkleTokens }
+              : hero
+          }),
+        }
+      }
+      if (!campaign.latestSession || campaign.latestSession.endedAtUtc !== null) {
+        throw new Error('The active adventure session could not be loaded. Please try again.')
+      }
+      setSelectedCampaign(campaign)
+      setPlayingAdventure(true)
+    } catch (startError) {
+      setError(startError instanceof Error ? startError.message : 'Could not start the adventure.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const updateAdventureCampaign = (updated: AdventureCampaign) => {
+    setSelectedCampaign((current) => current && current.id === updated.id
+      ? {
+          ...current,
+          heroes: current.heroes.map((hero) => {
+            const saved = updated.heroes.find((item) => item.id === hero.id)
+            return saved ? { ...hero, hearts: saved.hearts, sparkleTokens: saved.sparkleTokens } : hero
+          }),
+          latestSession: updated.latestSession,
+        }
+      : current)
   }
 
   const deleteCampaign = async (campaign: Campaign) => {
@@ -843,6 +884,15 @@ function App() {
             </>
           )}
         </section>
+      ) : selectedCampaign && playingAdventure && selectedCampaign.latestSession?.endedAtUtc === null ? (
+        <AdventurePlayScreen
+          key={`${selectedCampaign.id}-${selectedCampaign.latestSession.id}`}
+          campaign={selectedCampaign}
+          sessionId={selectedCampaign.latestSession.id}
+          client={adventureTurnClient}
+          onCampaignChange={updateAdventureCampaign}
+          onBack={() => setPlayingAdventure(false)}
+        />
       ) : selectedCampaign ? (
         <section className="campaign-room" aria-labelledby="room-title">
           <button className="text-button back-button" onClick={() => setSelectedCampaign(null)}>
@@ -856,7 +906,12 @@ function App() {
             </div>
             <div className="room-actions">
               {selectedCampaign.status === 'Active' && (
-                <button className="text-button" onClick={() => void changeStatus(selectedCampaign, 'complete')}>Mark complete</button>
+                <>
+                  <button className="button button-primary" disabled={saving} onClick={() => void startOrResumeAdventure()}>
+                    {saving ? 'Opening…' : selectedCampaign.latestSession?.endedAtUtc === null ? 'Resume adventure' : 'Start adventure'}
+                  </button>
+                  <button className="text-button" onClick={() => void changeStatus(selectedCampaign, 'complete')}>Mark complete</button>
+                </>
               )}
             </div>
           </div>

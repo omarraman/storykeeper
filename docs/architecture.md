@@ -33,6 +33,16 @@ records the result in one transaction, and returns typed, child-readable
 outcome data. The browser supplies the physical d20 value but does not
 calculate or persist the outcome.
 
+The tablet adventure screen consumes a typed `AdventureTurnClient` interface.
+Its current `DemoAdventureTurnClient` supplies deterministic local story beats
+and sample clues; fixture narration does not call an AI provider or persist
+story state. Session creation/resume and real-hero d20 checks use the existing
+server endpoints. When live gameplay narration is implemented, an HTTP turn
+client can replace the demo adapter without coupling fixture content to React views.
+If a campaign has no server-owned heroes, a visibly marked in-memory preview
+party supports UI exploration only; its die entry does not resolve game rules
+or persist resources.
+
 Campaign-generation inputs are saved as independent `CampaignBrief` drafts
 through `/api/campaign-briefs`. The API supports list, create, read, update,
 and delete operations with server-side request validation and server-owned
@@ -64,7 +74,7 @@ transaction. It creates a new isolated campaign with generated settings,
 campaign bible, locations, NPCs, and quests, and stores a versioned bible
 snapshot. The browser cannot directly persist generated campaign state.
 
-Live gameplay narration is not implemented. Campaign facts remain durable,
+Live AI gameplay narration is not implemented. Campaign facts remain durable,
 structured records distinct from session summaries or generated narration.
 The server-side d20 rules engine is implemented; AI may narrate its results but
 must not alter a roll, bonus, difficulty, heart, token, or saved rule state.

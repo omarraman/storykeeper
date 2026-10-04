@@ -32,6 +32,10 @@ strength bonus is below the target and a token is available. The check request
 must state whether the token is spent; the server validates eligibility and
 records the spend atomically with the outcome. Tokens cannot be shared or
 refunded and cannot lower difficulty.
+The play screen offers a listed hero strength and only presents the sparkle
+option when the entered die plus any selected strength is below the target.
+These UI hints do not resolve the check; the server remains authoritative and
+rejects an ineligible token request.
 
 ## Outcome bands
 

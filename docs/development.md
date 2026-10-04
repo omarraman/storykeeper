@@ -42,6 +42,12 @@ which keeps the database when the API container is recreated. Use
 
 ## Tests and migrations
 
+Run the web component tests with:
+
+```sh
+npm run test --workspace @storykeeper/web
+```
+
 Run backend tests with:
 
 ```sh
