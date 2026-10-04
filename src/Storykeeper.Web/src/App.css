@@ -15,12 +15,67 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   min-height: 88px;
   border-bottom: 1px solid #e8e2d5;
 }
 
+.install-button {
+  min-height: 48px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.install-dialog-backdrop {
+  position: fixed;
+  z-index: 10;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: #17241dcc;
+}
+
+.install-dialog {
+  position: relative;
+  width: min(100%, 520px);
+  padding: 36px;
+  border: 1px solid #e9e3d7;
+  border-radius: 22px;
+  background: #fffdf8;
+  box-shadow: 0 24px 70px #17241d40;
+}
+
+.install-dialog h2 {
+  margin: 10px 0 14px;
+  color: #263d34;
+  font-family: var(--serif);
+  font-size: 2rem;
+  font-weight: 500;
+}
+
+.install-dialog p:not(.eyebrow) {
+  color: #657167;
+  line-height: 1.65;
+}
+
+.install-dialog strong {
+  color: #344f41;
+}
+
+.install-error {
+  color: #8a463c !important;
+}
+
+.install-dialog .dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 22px;
+}
+
 .brand {
   display: inline-flex;
+  min-height: 44px;
   align-items: center;
   gap: 12px;
   color: #263d34;
@@ -1041,6 +1096,11 @@ select:focus-visible {
     min-height: 76px;
   }
 
+  .install-button {
+    min-height: 44px;
+    padding-inline: 14px;
+  }
+
   .library,
   .campaign-room {
     padding: 40px 0 50px;
@@ -1092,6 +1152,19 @@ select:focus-visible {
   .service-status {
     gap: 6px;
     font-size: 0.7rem;
+  }
+
+  .topbar {
+    gap: 9px;
+  }
+
+  .install-button {
+    padding-inline: 10px;
+    font-size: 0.78rem;
+  }
+
+  .install-dialog {
+    padding: 30px 23px 22px;
   }
 
   h1 {
@@ -1160,6 +1233,26 @@ select:focus-visible {
   .dialog-actions .button {
     flex: 1;
     padding-inline: 12px;
+  }
+}
+
+@media (max-width: 380px) {
+  .topbar {
+    flex-wrap: wrap;
+    padding-block: 10px;
+  }
+
+  .brand {
+    margin-right: auto;
+  }
+
+  .install-button {
+    margin-left: 0;
+  }
+
+  .service-status {
+    flex-basis: 100%;
+    justify-content: flex-end;
   }
 }
 
@@ -1402,7 +1495,7 @@ select:focus-visible {
 }
 
 .brief-card-actions .button {
-  min-height: 42px;
+  min-height: 48px;
   padding-inline: 13px;
   font-size: 0.82rem;
 }

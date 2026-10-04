@@ -51,6 +51,26 @@ run `docker compose down`.
 `WEB_PORT` and `API_PORT` in `.env` can change the host ports. The compose
 services use the API's internal Docker network address for web-to-API requests.
 
+## Production HTTPS deployment
+
+Point a public DNS name at the Docker host and allow inbound ports 80 and 443.
+Set `DOMAIN` and `ACME_EMAIL` in `.env`, then start the production stack:
+
+```sh
+docker compose -f docker-compose.production.yml up --build -d
+```
+
+Caddy obtains and renews the HTTPS certificate. The static web app and API are
+served on the same HTTPS origin; `/api` is reverse-proxied to the API, and the
+API and web containers are not exposed directly to the internet. The API uses
+the persistent `storykeeper-production-data` volume. Stop the stack with
+`docker compose -f docker-compose.production.yml down`; do not add `-v` unless
+you intend to delete its saved campaigns and certificates. Configure optional
+AI settings and `STORYKEEPER_PARENT_PIN` in the same untracked `.env` file.
+
+The PWA and service worker require HTTPS in production. Plain HTTP on
+`localhost` is permitted for local development.
+
 ## Build and smoke test
 
 Build both projects:

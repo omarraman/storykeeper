@@ -24,6 +24,8 @@ Current implementation focus:
   editable regeneration, and activation into saved quests.
 - Tablet-friendly campaign library with create, list, complete, archive,
   delete, and saved campaign resume.
+- Installable landscape Android PWA with HTTPS production delivery and a
+  cached app shell for brief connection interruptions.
 - Tablet landscape adventure-play screen with suggested and free-text actions,
   physical-d20 entry, and server-backed AI narration for playable campaigns.
 - Reusable campaign/domain model with SQLite persistence and campaign isolation.
@@ -51,6 +53,7 @@ Current implementation focus:
 |---|---|---|
 | [README.md](README.md) | Repository overview and local quick start | Planned |
 | [Development guide](docs/development.md) | Setup, run, test, configuration, and deployment guidance | Available |
+| [PWA installation and delivery](docs/pwa-delivery.md) | Android installation, app-shell caching, and production HTTPS delivery | Available |
 | [Architecture](docs/architecture.md) | Web PWA, API, persistence, and AI integration boundaries | Available |
 | [Domain model](docs/domain-model.md) | Campaigns, heroes, NPCs, facts, quests, sessions, and inventory | Available |
 | [Game rules](docs/game-rules.md) | Child-friendly d20 rules, hearts, sparkle tokens, and consequences | Available |

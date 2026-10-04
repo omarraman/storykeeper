@@ -3,7 +3,9 @@
   "short_name": "Storykeeper",
   "description": "A family-friendly home for imaginative tabletop adventures.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "landscape",
   "background_color": "#f8f5ec",
   "theme_color": "#f8f5ec",
   "icons": [

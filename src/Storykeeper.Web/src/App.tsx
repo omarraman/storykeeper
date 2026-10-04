@@ -5,6 +5,7 @@ import { AdventurePlayScreen } from './adventure/AdventurePlayScreen'
 import { CampaignContinuityPanel } from './adventure/CampaignContinuityPanel'
 import { ParentControlsPanel, type ParentSafetySettings } from './adventure/ParentControlsPanel'
 import { adventureTurnClient } from './adventure/client'
+import { PwaInstallControl } from './PwaInstallControl'
 import type { AdventureCampaign, SessionStartResponse } from './adventure/contracts'
 import './App.css'
 
@@ -618,6 +619,7 @@ function App() {
           <img src="/storykeeper.svg" alt="" />
           <span>Storykeeper</span>
         </a>
+        <PwaInstallControl />
         <span className={`service-status ${apiStatus}`} role="status" aria-live="polite">
           <span className="status-dot" aria-hidden="true" />
           {apiStatus === 'connected'

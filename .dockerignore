@@ -5,3 +5,5 @@
 **/obj
 **/dist
 **/coverage
+*.db
+*.db-*
