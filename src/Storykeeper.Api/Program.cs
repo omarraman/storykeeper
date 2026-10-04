@@ -16,6 +16,7 @@ builder.Services.AddScoped<ICampaignEntityRepository, CampaignEntityRepository>(
 builder.Services.AddScoped<ICampaignService, CampaignService>();
 builder.Services.AddScoped<IGameRulesService, GameRulesService>();
 builder.Services.AddScoped<ICampaignBriefService, CampaignBriefService>();
+builder.Services.AddScoped<ICampaignContinuityService, CampaignContinuityService>();
 builder.Services.Configure<StorykeeperAiOptions>(builder.Configuration.GetSection("Storykeeper:Ai"));
 builder.Services.AddHttpClient<ICampaignDraftGenerator, OpenAiCompatibleCampaignDraftGenerator>((services, client) =>
 {
@@ -95,6 +96,109 @@ app.MapPost("/api/campaigns/{campaignId:guid}/sessions", async (
     catch (RuleConflictException exception)
     {
         return Results.Problem(statusCode: 409, title: "Session cannot be started", detail: exception.Message);
+    }
+});
+
+app.MapGet("/api/campaigns/{campaignId:guid}/continuity", async (
+    Guid campaignId,
+    ICampaignContinuityService continuity,
+    CancellationToken cancellationToken) =>
+{
+    var result = await continuity.GetAsync(campaignId, cancellationToken);
+    return result is null ? Results.NotFound() : Results.Ok(result);
+});
+
+app.MapGet("/api/campaigns/{campaignId:guid}/facts/{factId:guid}", async (
+    Guid campaignId,
+    Guid factId,
+    ICampaignContinuityService continuity,
+    CancellationToken cancellationToken) =>
+{
+    var fact = await continuity.GetFactAsync(campaignId, factId, cancellationToken);
+    return fact is null ? Results.NotFound() : Results.Ok(fact);
+});
+
+app.MapPost("/api/campaigns/{campaignId:guid}/facts", async (
+    Guid campaignId,
+    CreateCampaignFactRequest? request,
+    ICampaignContinuityService continuity,
+    CancellationToken cancellationToken) =>
+{
+    var errors = CampaignContinuityRequestValidator.Validate(request);
+    if (errors.Count > 0)
+    {
+        return Results.ValidationProblem(errors);
+    }
+
+    try
+    {
+        var fact = await continuity.CreateFactAsync(campaignId, request!, cancellationToken);
+        return fact is null ? Results.NotFound() : Results.Created(
+            $"/api/campaigns/{campaignId}/facts/{fact.Id}", fact);
+    }
+    catch (RuleValidationException exception)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]> { ["fact"] = [exception.Message] });
+    }
+    catch (RuleConflictException exception)
+    {
+        return Results.Problem(statusCode: 409, title: "Fact cannot be created", detail: exception.Message);
+    }
+});
+
+app.MapPut("/api/campaigns/{campaignId:guid}/facts/{factId:guid}", async (
+    Guid campaignId,
+    Guid factId,
+    UpdateCampaignFactRequest? request,
+    ICampaignContinuityService continuity,
+    CancellationToken cancellationToken) =>
+{
+    var errors = CampaignContinuityRequestValidator.Validate(request);
+    if (errors.Count > 0)
+    {
+        return Results.ValidationProblem(errors);
+    }
+
+    try
+    {
+        var fact = await continuity.UpdateFactAsync(campaignId, factId, request!, cancellationToken);
+        return fact is null ? Results.NotFound() : Results.Ok(fact);
+    }
+    catch (RuleValidationException exception)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]> { ["fact"] = [exception.Message] });
+    }
+    catch (RuleConflictException exception)
+    {
+        return Results.Problem(statusCode: 409, title: "Fact cannot be updated", detail: exception.Message);
+    }
+});
+
+app.MapPut("/api/campaigns/{campaignId:guid}/sessions/{sessionId:guid}/summary", async (
+    Guid campaignId,
+    Guid sessionId,
+    SaveSessionSummaryRequest? request,
+    ICampaignContinuityService continuity,
+    CancellationToken cancellationToken) =>
+{
+    var errors = CampaignContinuityRequestValidator.Validate(request);
+    if (errors.Count > 0)
+    {
+        return Results.ValidationProblem(errors);
+    }
+
+    try
+    {
+        var summary = await continuity.SaveSummaryAsync(campaignId, sessionId, request!, cancellationToken);
+        return summary is null ? Results.NotFound() : Results.Ok(summary);
+    }
+    catch (RuleValidationException exception)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]> { ["summary"] = [exception.Message] });
+    }
+    catch (RuleConflictException exception)
+    {
+        return Results.Problem(statusCode: 409, title: "Session cannot be ended", detail: exception.Message);
     }
 });
 

@@ -26,14 +26,20 @@ campaign's party, hero, location, or session.
   reference a location in the same campaign.
 - `Quest` stores its title, description, and lifecycle status.
 - `Session` stores its sequence number, UTC start/end times, and optional
-  summary. Starting a session resets each hero to 3 hearts and 1 sparkle
-  token.
+  factual summary. Starting a session resets each hero to 3 hearts and 1
+  sparkle token. A running session must be summarized before another session
+  can start.
 - `CheckResolution` records a server-calculated d20 result, its session and
   hero, the difficulty and bonuses, the outcome band, the forward-progress
   requirement, and before/after heart and sparkle-token counts. Composite
   foreign keys keep both the hero and session within the owning campaign.
-- `CampaignFact` stores a durable statement, category, status, importance
-  from 1 to 5, and an optional source session from the same campaign.
+- `CampaignFact` stores a durable statement, category, status (`Proposed`,
+  `Active`, `Resolved`, `Superseded`, or `Discarded`), importance from 1 to 5,
+  and an optional source session from the same campaign. Only active facts
+  inform future narration; proposed facts await parent review.
+- `CampaignContinuityRevision` is an append-only audit entry for parent-created
+  or corrected facts and session summaries. It records prior and replacement
+  content, the campaign-scoped source session, editor label, and UTC edit time.
 - `Relationship` stores a campaign-scoped relationship between typed hero or
   NPC IDs. The entity repository verifies both participants belong to that
   campaign before persisting the relationship.
@@ -49,9 +55,11 @@ campaign's party, hero, location, or session.
 - `Reward` stores a campaign reward and may associate it with a hero from the
   same campaign.
 
-Fact metadata is distinct from narration: a session summary is a recap, while
-a campaign fact is an individually categorized claim that can be confirmed,
-superseded, or discarded and traced to its source session.
+Fact metadata is distinct from narration: a session summary is a compact
+recap, while a campaign fact is an individually categorized claim that can be
+activated, resolved, superseded, or discarded and traced to its source
+session. Continuity revisions are removed only when their campaign is
+permanently deleted.
 
 Campaign archival preserves all campaign data. Archived campaigns remain
 loadable for save/resume history but cannot be updated through the campaign

@@ -28,6 +28,7 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
     public DbSet<Session> Sessions => Set<Session>();
     public DbSet<CheckResolution> CheckResolutions => Set<CheckResolution>();
     public DbSet<CampaignFact> CampaignFacts => Set<CampaignFact>();
+    public DbSet<CampaignContinuityRevision> CampaignContinuityRevisions => Set<CampaignContinuityRevision>();
     public DbSet<Relationship> Relationships => Set<Relationship>();
     public DbSet<Reward> Rewards => Set<Reward>();
 
@@ -190,6 +191,14 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
                 .HasForeignKey(fact => new { fact.CampaignId, fact.SourceSessionId })
                 .HasPrincipalKey(session => new { session.CampaignId, session.Id })
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+        ConfigureCampaignEntity<CampaignContinuityRevision>(modelBuilder, entity =>
+        {
+            entity.Property(revision => revision.PreviousContent).HasMaxLength(4000);
+            entity.Property(revision => revision.NewContent).HasMaxLength(4000).IsRequired();
+            entity.Property(revision => revision.ChangedBy).HasMaxLength(80).IsRequired();
+            entity.HasIndex(revision => new { revision.CampaignId, revision.RecordType, revision.RecordId });
+            entity.HasIndex(revision => new { revision.CampaignId, revision.ChangedAtUtc });
         });
         ConfigureCampaignEntity<Relationship>(modelBuilder, entity =>
         {

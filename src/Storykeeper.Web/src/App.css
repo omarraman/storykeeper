@@ -662,6 +662,126 @@ textarea:focus-visible {
   white-space: pre-wrap;
 }
 
+.continuity-panel {
+  min-height: 0;
+  margin-top: 22px;
+}
+
+.continuity-panel > summary {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: #344f41;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.continuity-panel > summary > span:first-child {
+  display: grid;
+  gap: 5px;
+}
+
+.continuity-panel > summary > span:last-child {
+  color: #68746a;
+  font-size: 0.86rem;
+  font-weight: 400;
+}
+
+.continuity-panel h3 {
+  margin: 22px 0 10px;
+  color: #2b4539;
+  font-family: var(--serif);
+  font-size: 1.35rem;
+  font-weight: 500;
+}
+
+.continuity-panel h4 {
+  margin: 0 0 9px;
+  color: #344f41;
+}
+
+.continuity-facts,
+.continuity-summaries {
+  display: grid;
+  gap: 12px;
+}
+
+.continuity-record,
+.continuity-create-form {
+  display: grid;
+  gap: 9px;
+  padding: 15px;
+  border: 1px solid #e9e3d7;
+  border-radius: 14px;
+  background: #fffefa;
+}
+
+.continuity-record > label,
+.continuity-create-form > label {
+  display: grid;
+  gap: 5px;
+  color: #354e41;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.continuity-panel input,
+.continuity-panel textarea,
+.continuity-panel select {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid #d9ddd3;
+  border-radius: 9px;
+  color: #2b4539;
+  background: #fffefa;
+  font: inherit;
+}
+
+.continuity-panel textarea {
+  min-height: 76px;
+  resize: vertical;
+}
+
+.continuity-fact-controls {
+  display: flex;
+  gap: 12px;
+}
+
+.continuity-fact-controls label {
+  display: grid;
+  flex: 1;
+  gap: 5px;
+  color: #354e41;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.continuity-history {
+  padding-top: 8px;
+  border-top: 1px solid #eee9df;
+  color: #52695b;
+  font-size: 0.84rem;
+}
+
+.continuity-history > article {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 9px;
+  background: #f7f5ee;
+  overflow-wrap: anywhere;
+}
+
+.continuity-history p {
+  margin: 6px 0 0;
+}
+
+.continuity-create-form {
+  margin-top: 14px;
+}
+
 .quest-note {
   display: grid;
   gap: 6px;
@@ -758,6 +878,11 @@ textarea:focus-visible {
 
   .room-grid {
     grid-template-columns: 1fr;
+  }
+
+  .continuity-panel > summary {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .room-panel {

@@ -70,17 +70,45 @@ public sealed class StoryTurnService(
             .OrderBy(quest => quest.Title)
             .FirstOrDefault();
         var facts = await dbContext.CampaignFacts.AsNoTracking()
-            .Where(item => item.CampaignId == campaignId &&
-                           item.Status != CampaignFactStatus.Superseded &&
-                           item.Status != CampaignFactStatus.Discarded)
+            .Where(item => item.CampaignId == campaignId && item.Status == CampaignFactStatus.Active)
             .OrderByDescending(item => item.Importance)
+            .ThenBy(item => item.Statement)
             .Take(20)
             .ToArrayAsync(cancellationToken);
+        var unresolvedFacts = await dbContext.CampaignFacts.AsNoTracking()
+            .Where(item => item.CampaignId == campaignId &&
+                           item.Status == CampaignFactStatus.Active &&
+                           (item.Category == "promise" || item.Category == "thread"))
+            .OrderByDescending(item => item.Importance)
+            .ThenBy(item => item.Statement)
+            .Take(10)
+            .ToArrayAsync(cancellationToken);
+        var existingFactStatements = await dbContext.CampaignFacts.AsNoTracking()
+            .Where(item => item.CampaignId == campaignId)
+            .Select(item => item.Statement)
+            .ToArrayAsync(cancellationToken);
         var summaries = await dbContext.Sessions.AsNoTracking()
-            .Where(item => item.CampaignId == campaignId && item.Summary != null && item.Summary != "")
+            .Where(item => item.CampaignId == campaignId &&
+                           item.EndedAtUtc != null &&
+                           item.Summary != null &&
+                           item.Summary != "")
             .OrderByDescending(item => item.SessionNumber)
             .Take(3)
             .Select(item => item.Summary)
+            .ToArrayAsync(cancellationToken);
+        var completedQuests = quests.Where(quest => quest.Status == QuestStatus.Completed)
+            .OrderBy(quest => quest.Title)
+            .Take(5)
+            .ToArray();
+        var relationships = await dbContext.Relationships.AsNoTracking()
+            .Where(item => item.CampaignId == campaignId)
+            .OrderBy(item => item.Id)
+            .Take(20)
+            .ToArrayAsync(cancellationToken);
+        var rewards = await dbContext.Rewards.AsNoTracking()
+            .Where(item => item.CampaignId == campaignId)
+            .OrderBy(item => item.Name)
+            .Take(20)
             .ToArrayAsync(cancellationToken);
         var npcs = await dbContext.Npcs.AsNoTracking()
             .Where(item => item.CampaignId == campaignId)
@@ -125,13 +153,40 @@ public sealed class StoryTurnService(
                 currentQuest.Title,
                 description = Limit(currentQuest.Description, 800)
             },
+            completedQuests = completedQuests.Select(quest => new
+            {
+                quest.Title,
+                description = Limit(quest.Description, 500)
+            }),
             activeFacts = facts.Select(fact => new
             {
                 fact.Category,
                 statement = Limit(fact.Statement, 600),
                 fact.Importance
             }),
+            unresolvedThreads = unresolvedFacts.Select(fact => new
+                {
+                    fact.Category,
+                    statement = Limit(fact.Statement, 600),
+                    fact.Importance
+                }),
             latestSessionSummaries = summaries.Select(summary => Limit(summary, 1200)),
+            relationships = relationships.Select(relationship => new
+            {
+                subjectType = relationship.SubjectType.ToString(),
+                subjectName = ParticipantName(relationship.SubjectType, relationship.SubjectId, heroes, npcs),
+                relationship.SubjectId,
+                targetType = relationship.TargetType.ToString(),
+                targetName = ParticipantName(relationship.TargetType, relationship.TargetId, heroes, npcs),
+                relationship.TargetId,
+                description = Limit(relationship.Description, 500)
+            }),
+            rewards = rewards.Select(reward => new
+            {
+                reward.Name,
+                description = Limit(reward.Description, 500),
+                reward.IsClaimed
+            }),
             npcs = npcs.Take(10).Select(npc => new
             {
                 npc.Name,
@@ -171,8 +226,7 @@ public sealed class StoryTurnService(
 
         if (content.ProposedFacts!.Count > 0)
         {
-            var existingStatements = facts.Select(fact => fact.Statement)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var existingStatements = existingFactStatements.ToHashSet(StringComparer.OrdinalIgnoreCase);
             var newFacts = content.ProposedFacts
                 .Where(proposal => existingStatements.Add(proposal!.Statement!))
                 .Select(proposal => new CampaignFact
@@ -252,4 +306,13 @@ public sealed class StoryTurnService(
 
     private static string? Limit(string? value, int maximum) =>
         value is null || value.Length <= maximum ? value : value[..maximum];
+
+    private static string? ParticipantName(
+        RelationshipParticipantType type,
+        Guid id,
+        IReadOnlyList<Hero> heroes,
+        IReadOnlyList<Npc> npcs) =>
+        type == RelationshipParticipantType.Hero
+            ? heroes.FirstOrDefault(hero => hero.Id == id)?.Name
+            : npcs.FirstOrDefault(npc => npc.Id == id)?.Name;
 }

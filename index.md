@@ -27,6 +27,8 @@ Current implementation focus:
 - Reusable campaign/domain model with SQLite persistence and campaign isolation.
 - Server-authoritative, child-friendly d20 checks with session hearts, sparkle
   tokens, and forward-progress outcomes.
+- Campaign-scoped continuity with parent-curated session summaries, reviewable
+  facts, relevance-selected prompt context, and an edit audit trail.
 - Text-first, tablet-first play before optional voice interaction.
 
 ## Core principles
@@ -48,9 +50,9 @@ Current implementation focus:
 | [Architecture](docs/architecture.md) | Web PWA, API, persistence, and AI integration boundaries | Available |
 | [Domain model](docs/domain-model.md) | Campaigns, heroes, NPCs, facts, quests, sessions, and inventory | Available |
 | [Game rules](docs/game-rules.md) | Child-friendly d20 rules, hearts, sparkle tokens, and consequences | Available |
-| [Adventure play](docs/adventure-play.md) | Play screen, typed turn-client boundary, demo adapter, and authoritative roll integration | Available |
+| [Adventure play](docs/adventure-play.md) | Play screen, session wrap-up, parent continuity controls, typed turn-client boundary, and authoritative roll integration | Available |
 | [Campaign generation](docs/campaign-generation.md) | CampaignBrief wizard, validated generation, approval, activation, and bible versions | Available |
-| [AI Storykeeper](docs/ai-storykeeper.md) | Prompting, schemas, turn processing, validation, and continuity | Available |
+| [AI Storykeeper](docs/ai-storykeeper.md) | Prompting, schemas, turn processing, validation, and relevance-selected continuity | Available |
 | [Safety and parent controls](docs/safety-and-parent-controls.md) | Safety defaults, settings, parent PIN, pacing, and overrides | Planned |
 | [ADR directory](docs/decisions/) | Long-lived architecture decisions and their rationale | Planned |
 

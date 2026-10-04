@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { request } from './api/request'
 import { AdventurePlayScreen } from './adventure/AdventurePlayScreen'
+import { CampaignContinuityPanel } from './adventure/CampaignContinuityPanel'
 import { adventureTurnClient } from './adventure/client'
 import type { AdventureCampaign, SessionStartResponse } from './adventure/contracts'
 import './App.css'
@@ -951,6 +952,11 @@ function App() {
               )}
             </section>
           </div>
+          <CampaignContinuityPanel
+            campaignId={selectedCampaign.id}
+            sourceSessionId={selectedCampaign.latestSession?.id ?? null}
+            readOnly={selectedCampaign.status === 'Archived'}
+          />
         </section>
       ) : (
         <section className="library" aria-labelledby="library-title">

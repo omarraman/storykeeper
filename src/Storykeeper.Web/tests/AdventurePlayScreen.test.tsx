@@ -1,6 +1,8 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AdventurePlayScreen } from '../src/adventure/AdventurePlayScreen'
+import { CampaignContinuityPanel } from '../src/adventure/CampaignContinuityPanel'
+import type { CampaignContinuityClient } from '../src/adventure/continuityClient'
 import { DemoAdventureTurnClient } from '../src/adventure/demoAdventureTurnClient'
 import type {
   AdventureCampaign,
@@ -333,5 +335,93 @@ describe('AdventurePlayScreen', () => {
     expect(client.submitAction).toHaveBeenLastCalledWith(expect.objectContaining({
       action: 'Ask the gardener about the map',
     }))
+  })
+
+  it('ends a campaign session only after saving a factual parent summary', async () => {
+    const continuityClient: CampaignContinuityClient = {
+      load: vi.fn(),
+      createFact: vi.fn(),
+      updateFact: vi.fn(),
+      saveSummary: vi.fn(),
+      endSession: vi.fn(async () => campaign),
+    }
+    const onBack = vi.fn()
+    render(
+      <AdventurePlayScreen
+        campaign={campaign}
+        sessionId="session-1"
+        client={createClient()}
+        continuityClient={continuityClient}
+        onCampaignChange={vi.fn()}
+        onBack={onBack}
+      />,
+    )
+
+    fireEvent.click(screen.getByText('Parent: wrap up this adventure'))
+    fireEvent.change(screen.getByLabelText('Session summary'), {
+      target: { value: 'Rowan found the folded map and promised to help Mira.' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save summary and end adventure' }))
+
+    await waitFor(() => expect(continuityClient.endSession).toHaveBeenCalledWith({
+      campaignId: campaign.id,
+      sessionId: 'session-1',
+      summary: 'Rowan found the folded map and promised to help Mira.',
+    }))
+    expect(onBack).toHaveBeenCalledOnce()
+  })
+
+  it('provides parent correction controls for saved facts and summaries', async () => {
+    const savedContinuity = {
+      facts: [{
+        id: 'fact-1',
+        sourceSessionId: 'session-1',
+        category: 'promise',
+        statement: 'Mira promised to show the map room.',
+        status: 'Proposed' as const,
+        importance: 3,
+        lastEditedAtUtc: null,
+      }],
+      summaries: [{
+        sessionId: 'session-1',
+        sessionNumber: 1,
+        summary: 'Rowan found a folded map.',
+        endedAtUtc: '2026-10-04T00:00:00Z',
+        lastEditedAtUtc: null,
+      }],
+      revisions: [],
+    }
+    const continuityClient: CampaignContinuityClient = {
+      load: vi.fn(async () => savedContinuity),
+      createFact: vi.fn(async () => savedContinuity.facts[0]),
+      updateFact: vi.fn(async ({ fact }) => fact),
+      saveSummary: vi.fn(),
+      endSession: vi.fn(async () => campaign),
+    }
+    render(
+      <CampaignContinuityPanel
+        campaignId={campaign.id}
+        sourceSessionId="session-1"
+        client={continuityClient}
+      />,
+    )
+    fireEvent.click(screen.getByText('Campaign continuity'))
+
+    expect(await screen.findByDisplayValue('Mira promised to show the map room.')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('Fact'), {
+      target: { value: 'Mira promised to help Rowan find the map room.' },
+    })
+    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'Active' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save fact correction' }))
+
+    await waitFor(() => expect(continuityClient.updateFact).toHaveBeenCalledWith({
+      campaignId: campaign.id,
+      fact: expect.objectContaining({
+        id: 'fact-1',
+        statement: 'Mira promised to help Rowan find the map room.',
+        status: 'Active',
+      }),
+    }))
+    expect(screen.getByDisplayValue('Rowan found a folded map.')).toBeTruthy()
   })
 })

@@ -33,6 +33,11 @@ records the result in one transaction, and returns typed, child-readable
 outcome data. The browser supplies the physical d20 value but does not
 calculate or persist the outcome.
 
+A running session cannot be silently closed by starting another one. The
+parent saves a factual summary through the continuity API to end it. Parent
+fact and summary corrections are stored in campaign-scoped append-only
+continuity revisions, including prior and replacement content.
+
 The tablet adventure screen consumes a typed `AdventureTurnClient` interface.
 Its current `DemoAdventureTurnClient` supplies deterministic local story beats
 and sample clues; fixture narration does not call an AI provider or persist

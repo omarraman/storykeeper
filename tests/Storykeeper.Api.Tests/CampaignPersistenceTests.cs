@@ -102,7 +102,7 @@ public sealed class CampaignPersistenceTests
             SourceSessionId = session.Id,
             Category = "Clue",
             Statement = "The silver feather belongs to the sky messenger.",
-            Status = CampaignFactStatus.Confirmed,
+            Status = CampaignFactStatus.Active,
             Importance = 4
         });
 
@@ -110,7 +110,7 @@ public sealed class CampaignPersistenceTests
 
         Assert.NotNull(stored);
         Assert.Equal("Clue", stored.Category);
-        Assert.Equal(CampaignFactStatus.Confirmed, stored.Status);
+        Assert.Equal(CampaignFactStatus.Active, stored.Status);
         Assert.Equal(4, stored.Importance);
         Assert.Equal(session.Id, stored.SourceSessionId);
     }
@@ -152,7 +152,7 @@ public sealed class CampaignPersistenceTests
             SourceSessionId = session.Id,
             Category = "Clue",
             Statement = "The trail leads north.",
-            Status = CampaignFactStatus.Confirmed,
+            Status = CampaignFactStatus.Active,
             Importance = 3
         });
 

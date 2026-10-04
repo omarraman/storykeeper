@@ -9,10 +9,13 @@ Campaign, session, and hero are checked on the server; browser-provided story
 context is never trusted.
 
 The server sends only that campaign's settings, bible, party (or selected
-hero), current quest, up to 20 active facts, the three latest non-empty session
-summaries, NPCs, and locations to the AI provider. Active facts exclude
-superseded and discarded records. The provider receives the player's action
-as untrusted text under a stable child-safety narrator prompt.
+hero), current quest and recent completed quests, up to 20 active facts, the
+three latest ended-session summaries, unresolved promise/thread facts,
+relationships, rewards, NPCs, and locations to the AI provider. Proposed,
+resolved, superseded, and discarded facts are not used as active continuity.
+Inventory and completed quests are loaded from their saved campaign records.
+The provider receives the player's action and saved story context as untrusted
+content under a stable child-safety narrator prompt.
 
 Responses use strict typed JSON with no unknown properties. A response is
 either `roll_required` with a server-validated difficulty, optional listed
@@ -25,11 +28,24 @@ The API validates response lengths, choice identifiers, NPC attribution,
 roll difficulty and strength, fact categories and importance, and child-safety
 content before applying anything. A roll request does not persist state.
 Validated fact proposals are saved only as `Proposed` campaign facts, scoped
-to the current campaign and source session; duplicate active statements are
-not added. The model cannot write directly to the database or alter quest
-status, hero resources, rules, or dice results. A malformed, unsafe, or
-unavailable provider response returns a safe, retryable structured error and
-is not saved.
+to the current campaign and source session; duplicate statements are not
+re-added. A parent can create facts or promote, correct, resolve, supersede,
+or discard proposals. Only `Active` facts enter future prompts. Parent
+corrections append an audit record containing the prior and updated values.
+The model cannot write directly to the database or alter quest status, hero
+resources, rules, or dice results. A malformed, unsafe, or unavailable
+provider response returns a safe, retryable structured error and is not saved.
+
+`GET /api/campaigns/{campaignId}/continuity` returns campaign facts, saved
+session summaries, and their revision history. `GET
+/api/campaigns/{campaignId}/facts/{factId}` reads one campaign-owned fact.
+`POST /api/campaigns/{campaignId}/facts` creates a parent-approved fact;
+`PUT /api/campaigns/{campaignId}/facts/{factId}` corrects its content and
+status. `PUT
+/api/campaigns/{campaignId}/sessions/{sessionId}/summary` saves a compact
+parent-curated recap and ends the current session, or corrects a prior recap.
+Every save or correction is audited. Summaries are bounded and
+child-safety validated; transcripts are not required to continue a campaign.
 
 After a physical check, the web client submits the original action with the
 check-resolution ID. The API verifies that this is the latest check for the

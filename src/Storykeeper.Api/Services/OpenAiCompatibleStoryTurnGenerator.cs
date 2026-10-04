@@ -34,7 +34,7 @@ public sealed class OpenAiCompatibleStoryTurnGenerator(
           "npcDialogue":[{"npcName":"existing campaign NPC name","text":"string"}],
           "rollRequest":null or {"prompt":"string","difficulty":"Easy, Tricky, or Heroic","strength":"listed hero strength or null","risky":false},
           "choices":[{"id":"short-unique-id","text":"optional suggestion"}],
-          "proposedFacts":[{"category":"clue, world, npc, quest, party, location, object, or other","statement":"durable fact supported by this turn","importance":1}]
+          "proposedFacts":[{"category":"clue, world, npc, quest, party, location, object, promise, thread, relationship, reward, or other","statement":"durable fact supported by this turn","importance":1}]
         }
         Provide 1-4 optional suggested choices, up to 3 NPC dialogue lines, and up to 3 genuinely useful fact proposals.
         If a roll is needed, return a rollRequest and keep proposedFacts empty. Do not add any extra properties or markdown.

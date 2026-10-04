@@ -7,7 +7,8 @@ public static class StoryTurnContentValidator
 {
     private static readonly HashSet<string> FactCategories = new(StringComparer.OrdinalIgnoreCase)
     {
-        "clue", "world", "npc", "quest", "party", "location", "object", "other"
+        "clue", "world", "npc", "quest", "party", "location", "object",
+        "promise", "thread", "relationship", "reward", "other"
     };
 
     public static Dictionary<string, string[]> Validate(

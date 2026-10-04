@@ -7,6 +7,7 @@ import type {
   HeroStatus,
   StoryBeat,
 } from './contracts'
+import { campaignContinuityClient, type CampaignContinuityClient } from './continuityClient'
 import './AdventurePlayScreen.css'
 
 const difficultyTargets: Record<CheckDifficulty, number> = { Easy: 8, Tricky: 12, Heroic: 16 }
@@ -15,6 +16,7 @@ interface AdventurePlayScreenProps {
   campaign: AdventureCampaign
   sessionId: string
   client: AdventureTurnClient
+  continuityClient?: CampaignContinuityClient
   onCampaignChange: (campaign: AdventureCampaign) => void
   onBack: () => void
 }
@@ -23,6 +25,7 @@ export function AdventurePlayScreen({
   campaign,
   sessionId,
   client,
+  continuityClient = campaignContinuityClient,
   onCampaignChange,
   onBack,
 }: AdventurePlayScreenProps) {
@@ -44,6 +47,9 @@ export function AdventurePlayScreen({
   const [roll, setRoll] = useState('')
   const [strength, setStrength] = useState('')
   const [spendSparkleToken, setSpendSparkleToken] = useState(false)
+  const [sessionSummary, setSessionSummary] = useState('')
+  const [savingSummary, setSavingSummary] = useState(false)
+  const [summaryError, setSummaryError] = useState('')
 
   const pendingRoll = turn.type === 'roll_required' ? turn.rollRequired : null
   const selectedHero = state.heroes.find((hero) => hero.id === selectedHeroId) ?? state.heroes[0]
@@ -172,6 +178,31 @@ export function AdventurePlayScreen({
     } else {
       setError('')
       setRetryableAction(false)
+    }
+  }
+
+  const finishSession = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const summary = sessionSummary.trim()
+    if (!summary) {
+      setSummaryError('Add a short factual recap before ending the adventure.')
+      return
+    }
+
+    setSavingSummary(true)
+    setSummaryError('')
+    try {
+      const updatedCampaign = await continuityClient.endSession({
+        campaignId: campaign.id,
+        sessionId,
+        summary,
+      })
+      onCampaignChange(updatedCampaign)
+      onBack()
+    } catch (saveError) {
+      setSummaryError(saveError instanceof Error ? saveError.message : 'The adventure could not be ended.')
+    } finally {
+      setSavingSummary(false)
     }
   }
 
@@ -389,6 +420,21 @@ export function AdventurePlayScreen({
         )}
         {busy && <p className="adventure-loading" role="status">The story is catching up…</p>}
       </section>
+
+      <details className="adventure-wrap-up">
+        <summary>Parent: wrap up this adventure</summary>
+        <form onSubmit={(event) => void finishSession(event)}>
+          <p>Keep it brief and factual: note discoveries, rewards, important relationships, and promises still open. The full play-by-play is not saved as continuity.</p>
+          <label htmlFor="session-summary">Session summary</label>
+          <textarea id="session-summary" required maxLength={1200} rows={3}
+            value={sessionSummary} onChange={(event) => setSessionSummary(event.target.value)}
+            disabled={savingSummary} />
+          {summaryError && <p className="adventure-error" role="alert">{summaryError}</p>}
+          <button className="button button-primary" type="submit" disabled={savingSummary || !sessionSummary.trim()}>
+            {savingSummary ? 'Saving summary…' : 'Save summary and end adventure'}
+          </button>
+        </form>
+      </details>
     </section>
   )
 }

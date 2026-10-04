@@ -36,12 +36,12 @@ public sealed class GameRulesService(StorykeeperDbContext dbContext) : IGameRule
             throw new RuleConflictException("A new session can only start in an active campaign.");
         }
 
-        var now = DateTimeOffset.UtcNow;
-        foreach (var activeSession in campaign.Sessions.Where(session => session.EndedAtUtc is null))
+        if (campaign.Sessions.Any(session => session.EndedAtUtc is null))
         {
-            activeSession.EndedAtUtc = now;
+            throw new RuleConflictException("Write a factual session summary before starting another session.");
         }
 
+        var now = DateTimeOffset.UtcNow;
         var heroes = campaign.Party?.Heroes.OrderBy(hero => hero.Name).ToArray() ?? [];
         foreach (var hero in heroes)
         {

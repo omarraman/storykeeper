@@ -27,6 +27,12 @@ validates the hero, session, die result, strength, sparkle token, and outcome,
 then persists the resource changes. The UI refreshes and displays those
 server-returned values; it does not resolve the check.
 
+At session end, a parent enters a compact factual recap in the play screen.
+Saving the recap ends the current session; a new session cannot silently close
+an unfinished one. The campaign room's continuity controls let a parent add
+or correct facts, mark them active/resolved/superseded/discarded, revise
+summaries, and inspect the preserved correction history.
+
 The current campaign authoring UI may produce a campaign with no heroes. For
 that case the demo adapter supplies a clearly marked, in-memory preview hero
 and sample state so the screen's interaction flow can be explored. Its

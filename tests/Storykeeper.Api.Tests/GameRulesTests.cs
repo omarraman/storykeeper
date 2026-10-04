@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Storykeeper.Api.Contracts;
 using Storykeeper.Api.Data;
 using Storykeeper.Api.Domain;
 using Storykeeper.Api.Services;
@@ -221,7 +222,7 @@ public sealed class GameRulesTests
     }
 
     [Fact]
-    public async Task StartingANewSessionResetsResourcesAndClosesThePreviousSession()
+    public async Task StartingANewSessionRequiresSummaryAndResetsResources()
     {
         await using var database = await TestDatabase.CreateAsync();
         var (campaign, hero) = await CreateCampaignWithHeroAsync(database.Context);
@@ -230,6 +231,12 @@ public sealed class GameRulesTests
         hero.Hearts = 1;
         hero.SparkleTokens = 0;
         await database.Context.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<RuleConflictException>(() => rules.StartSessionAsync(campaign.Id));
+        await new CampaignContinuityService(database.Context).SaveSummaryAsync(
+            campaign.Id,
+            firstSession.Id,
+            new SaveSessionSummaryRequest("Pip found the lantern map and promised to bring it back."));
 
         var secondSession = (await rules.StartSessionAsync(campaign.Id)).Session!;
 
