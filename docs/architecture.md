@@ -24,6 +24,12 @@ with `POST /api/campaigns/{id}/complete`, archives them with
 The selected campaign ID is a browser preference in local storage; campaign
 facts and saved story state remain server-side in SQLite.
 
+Campaign-generation inputs are saved as independent `CampaignBrief` drafts
+through `/api/campaign-briefs`. The API supports list, create, read, update,
+and delete operations with server-side request validation and server-owned
+safety boundaries. A brief is not a campaign and is not converted into
+campaign state until a later generation and approval workflow.
+
 ## Storage configuration
 
 `ConnectionStrings:Storykeeper` selects the SQLite connection string and can

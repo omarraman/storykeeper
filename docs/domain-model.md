@@ -30,6 +30,10 @@ campaign's party, hero, location, or session.
 - `Relationship` stores a campaign-scoped relationship between typed hero or
   NPC IDs. The entity repository verifies both participants belong to that
   campaign before persisting the relationship.
+- `CampaignBrief` stores a parent-authored campaign idea before generation:
+  title, genre, tone, intended campaign and session lengths, optional
+  inclusions and exclusions, and a free-text story idea. Briefs are saved
+  independently of campaigns and have creation/update timestamps.
 - `Reward` stores a campaign reward and may associate it with a hero from the
   same campaign.
 
@@ -53,3 +57,9 @@ within a campaign, and fact importance validation.
 
 Relationship participants are currently heroes or NPCs. Add new participant
 types explicitly when the domain adds more character categories.
+
+Every campaign brief receives server-owned safety boundaries: no gore or
+cruelty, mature themes, permanent character death, or mandatory tactical
+combat, and low-fright, age-appropriate content. These boundaries are not
+editable through the brief API. Campaign and session lengths are validated
+server-side to 1-30 sessions and 15-180 minutes respectively.

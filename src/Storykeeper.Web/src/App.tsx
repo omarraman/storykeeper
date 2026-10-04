@@ -4,6 +4,36 @@ import './App.css'
 type ApiStatus = 'checking' | 'connected' | 'unavailable'
 type CampaignStatus = 'Active' | 'Completed' | 'Archived'
 type CampaignTab = CampaignStatus
+type CampaignBriefInput = {
+  title: string
+  genre: string
+  tone: string
+  campaignLengthSessions: number
+  sessionLengthMinutes: number
+  inclusions: string[]
+  exclusions: string[]
+  storyIdea: string | null
+}
+type CampaignBrief = CampaignBriefInput & {
+  id: string
+  safetyBoundaries: string[]
+  createdAtUtc: string
+  updatedAtUtc: string
+}
+const briefSteps = ['The world', 'The adventure', 'Your guardrails']
+
+function newBrief(): CampaignBriefInput {
+  return {
+    title: '',
+    genre: 'Cozy fantasy',
+    tone: 'Warm, funny, and adventurous',
+    campaignLengthSessions: 6,
+    sessionLengthMinutes: 45,
+    inclusions: [],
+    exclusions: [],
+    storyIdea: '',
+  }
+}
 
 type Campaign = {
   id: string
@@ -69,10 +99,15 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 function App() {
   const [apiStatus, setApiStatus] = useState<ApiStatus>('checking')
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [briefs, setBriefs] = useState<CampaignBrief[]>([])
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null)
   const [activeTab, setActiveTab] = useState<CampaignTab>('Active')
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
+  const [showWizard, setShowWizard] = useState(false)
+  const [editingBriefId, setEditingBriefId] = useState<string | null>(null)
+  const [briefForm, setBriefForm] = useState<CampaignBriefInput>(newBrief)
+  const [wizardStep, setWizardStep] = useState(0)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -116,8 +151,10 @@ function App() {
       try {
         const storedId = localStorage.getItem(selectedCampaignKey)
         const result = await request<Campaign[]>('/api/campaigns')
+        const savedBriefs = await request<CampaignBrief[]>('/api/campaign-briefs')
         if (stopped) return
         setCampaigns(result)
+        setBriefs(savedBriefs)
         if (storedId && result.some((campaign) => campaign.id === storedId)) {
           const storedCampaign = await request<Campaign>(`/api/campaigns/${encodeURIComponent(storedId)}`)
           if (stopped) return
@@ -152,6 +189,23 @@ function App() {
     }
   }
 
+  const startBrief = (brief?: CampaignBrief) => {
+    setError('')
+    setEditingBriefId(brief?.id ?? null)
+    setBriefForm(brief ? {
+      title: brief.title,
+      genre: brief.genre,
+      tone: brief.tone,
+      campaignLengthSessions: brief.campaignLengthSessions,
+      sessionLengthMinutes: brief.sessionLengthMinutes,
+      inclusions: [...brief.inclusions],
+      exclusions: [...brief.exclusions],
+      storyIdea: brief.storyIdea,
+    } : newBrief())
+    setWizardStep(0)
+    setShowWizard(true)
+  }
+
   const createCampaign = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const formData = new FormData(event.currentTarget)
@@ -174,6 +228,63 @@ function App() {
       setSaving(false)
     }
   }
+
+  const discardBrief = async (brief: CampaignBrief) => {
+    if (!window.confirm(`Discard the saved brief “${brief.title}”? This cannot be undone.`)) return
+    setError('')
+    try {
+      await request<void>(`/api/campaign-briefs/${encodeURIComponent(brief.id)}`, { method: 'DELETE' })
+      setBriefs((current) => current.filter((item) => item.id !== brief.id))
+    } catch (discardError) {
+      setError(discardError instanceof Error ? discardError.message : 'Could not discard this campaign brief.')
+    }
+  }
+
+  const saveBrief = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setSaving(true)
+    setError('')
+    try {
+      const saved = await request<CampaignBrief>(
+        editingBriefId ? `/api/campaign-briefs/${encodeURIComponent(editingBriefId)}` : '/api/campaign-briefs',
+        {
+          method: editingBriefId ? 'PUT' : 'POST',
+          body: JSON.stringify({ ...briefForm, storyIdea: briefForm.storyIdea || null }),
+        },
+      )
+      setBriefs((current) => [saved, ...current.filter((brief) => brief.id !== saved.id)])
+      setShowWizard(false)
+      setEditingBriefId(null)
+      setWizardStep(0)
+      setError('')
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Could not save this campaign brief.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const continueWizard = () => {
+    if (wizardStep === 0 && (!briefForm.title.trim() || !briefForm.genre.trim() || !briefForm.tone.trim())) {
+      setError('Add a story world title, genre, and tone before continuing.')
+      return
+    }
+    setError('')
+    setWizardStep((step) => Math.min(step + 1, briefSteps.length - 1))
+  }
+
+  const leaveWizard = () => {
+    setShowWizard(false)
+    setEditingBriefId(null)
+    setWizardStep(0)
+    setError('')
+  }
+
+  const updateBrief = <K extends keyof CampaignBriefInput>(key: K, value: CampaignBriefInput[K]) => {
+    setBriefForm((current) => ({ ...current, [key]: value }))
+  }
+
+  const editLines = (value: string) => value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
 
   const changeStatus = async (campaign: Campaign, action: 'complete' | 'archive') => {
     const label = action === 'complete' ? 'complete' : 'archive'
@@ -221,7 +332,116 @@ function App() {
         </span>
       </header>
 
-      {selectedCampaign ? (
+      {showWizard ? (
+        <section className="brief-wizard" aria-labelledby="brief-title">
+          <button className="text-button back-button" onClick={leaveWizard} disabled={saving}>
+            <span aria-hidden="true">←</span> Story worlds and saved briefs
+          </button>
+          <div className="wizard-heading">
+            <div>
+              <p className="eyebrow">Parent-led campaign setup</p>
+              <h1 id="brief-title">{editingBriefId ? 'Shape your story brief.' : 'Imagine a new world.'}</h1>
+              <p className="intro">A few gentle choices help set the scene. You can edit this saved brief any time before generation.</p>
+            </div>
+            <div className="wizard-steps" aria-label="Campaign brief steps">
+              {briefSteps.map((step, index) => (
+                <span className={`wizard-step ${index === wizardStep ? 'current' : ''} ${index < wizardStep ? 'complete' : ''}`}
+                  aria-current={index === wizardStep ? 'step' : undefined} key={step}>
+                  <span>{index + 1}</span>{step}
+                </span>
+              ))}
+            </div>
+          </div>
+          {error && <p className="alert" role="alert">{error}</p>}
+          <form className="wizard-panel" onSubmit={(event) => void saveBrief(event)}>
+            {wizardStep === 0 && (
+              <div className="wizard-fields">
+                <div className="wizard-copy">
+                  <p className="card-kicker">STEP 1 · THE WORLD</p>
+                  <h2>Where will your story begin?</h2>
+                  <p>Start with a name, then choose a genre and a feeling for the adventure.</p>
+                </div>
+                <div className="field-stack">
+                  <label htmlFor="brief-title-input">Story world title</label>
+                  <input id="brief-title-input" autoFocus maxLength={120} required value={briefForm.title}
+                    onChange={(event) => updateBrief('title', event.target.value)} placeholder="The Moonlit Woods" />
+                  <label htmlFor="brief-genre">Genre</label>
+                  <input id="brief-genre" maxLength={100} required value={briefForm.genre}
+                    onChange={(event) => updateBrief('genre', event.target.value)} placeholder="Cozy fantasy, space explorers…" />
+                  <label htmlFor="brief-tone">Tone</label>
+                  <input id="brief-tone" maxLength={300} required value={briefForm.tone}
+                    onChange={(event) => updateBrief('tone', event.target.value)} placeholder="Warm, funny, adventurous…" />
+                  <label htmlFor="brief-idea">Your story spark <span>(optional)</span></label>
+                  <textarea id="brief-idea" maxLength={2000} rows={3} value={briefForm.storyIdea ?? ''}
+                    onChange={(event) => updateBrief('storyIdea', event.target.value)} placeholder="A tiny dragon is looking for a place to belong…" />
+                </div>
+              </div>
+            )}
+            {wizardStep === 1 && (
+              <div className="wizard-fields">
+                <div className="wizard-copy">
+                  <p className="card-kicker">STEP 2 · THE ADVENTURE</p>
+                  <h2>Make room for the fun.</h2>
+                  <p>Choose a comfortable length. The story can always find a kind way forward.</p>
+                </div>
+                <div className="field-stack">
+                  <label htmlFor="brief-campaign-length">Campaign length</label>
+                  <select id="brief-campaign-length" value={briefForm.campaignLengthSessions}
+                    onChange={(event) => updateBrief('campaignLengthSessions', Number(event.target.value))}>
+                    <option value={3}>A short tale · 3 sessions</option>
+                    <option value={6}>A story season · 6 sessions</option>
+                    <option value={10}>A grand adventure · 10 sessions</option>
+                  </select>
+                  <label htmlFor="brief-session-length">Session length</label>
+                  <select id="brief-session-length" value={briefForm.sessionLengthMinutes}
+                    onChange={(event) => updateBrief('sessionLengthMinutes', Number(event.target.value))}>
+                    <option value={30}>About 30 minutes</option>
+                    <option value={45}>About 45 minutes</option>
+                    <option value={60}>About an hour</option>
+                    <option value={90}>About 90 minutes</option>
+                  </select>
+                </div>
+              </div>
+            )}
+            {wizardStep === 2 && (
+              <div className="wizard-fields">
+                <div className="wizard-copy">
+                  <p className="card-kicker">STEP 3 · YOUR GUARDRAILS</p>
+                  <h2>Keep the story just right.</h2>
+                  <p>Add favorite ingredients or anything you would rather leave out. These safety promises always stay in place.</p>
+                  <ul className="safety-list" aria-label="Always included safety boundaries">
+                    {(briefs.find((brief) => brief.id === editingBriefId)?.safetyBoundaries ?? [
+                      'No gore or cruelty',
+                      'No mature themes',
+                      'No permanent character death',
+                      'No mandatory tactical combat',
+                      'Keep the adventure low-fright and age-appropriate',
+                    ]).map((boundary) => <li key={boundary}>{boundary}</li>)}
+                  </ul>
+                </div>
+                <div className="field-stack">
+                  <label htmlFor="brief-inclusions">Things to include <span>(one per line, optional)</span></label>
+                  <textarea id="brief-inclusions" maxLength={2000} rows={5} value={briefForm.inclusions.join('\n')}
+                    onChange={(event) => updateBrief('inclusions', editLines(event.target.value))} placeholder={'Friendly dragons\nPuzzles and hidden gardens\nA helpful talking fox'} />
+                  <label htmlFor="brief-exclusions">Things to avoid <span>(one per line, optional)</span></label>
+                  <textarea id="brief-exclusions" maxLength={2000} rows={4} value={briefForm.exclusions.join('\n')}
+                    onChange={(event) => updateBrief('exclusions', editLines(event.target.value))} placeholder={'Spiders\nStorms'} />
+                </div>
+              </div>
+            )}
+            <div className="wizard-actions">
+              <button className="text-button" type="button" onClick={leaveWizard} disabled={saving}>Discard changes</button>
+              <span className="wizard-action-spacer" />
+              {wizardStep > 0 && <button className="button button-secondary" type="button" onClick={() => { setError(''); setWizardStep((step) => step - 1) }} disabled={saving}>Back</button>}
+              {wizardStep < briefSteps.length - 1 ? (
+                <button className="button button-primary" type="button" onClick={continueWizard}>Next step <span aria-hidden="true">→</span></button>
+              ) : (
+                <button className="button button-primary" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save campaign brief'}</button>
+              )}
+            </div>
+          </form>
+        </section>
+      ) : selectedCampaign ? (
         <section className="campaign-room" aria-labelledby="room-title">
           <button className="text-button back-button" onClick={() => setSelectedCampaign(null)}>
             <span aria-hidden="true">←</span> All story worlds
@@ -283,12 +503,44 @@ function App() {
               <h1 id="library-title">Your story <em>worlds.</em></h1>
               <p className="intro">Every adventure stays safe in its own storybook. Pick up where you left off, or start somewhere new.</p>
             </div>
-            <button className="button button-primary create-button" onClick={() => { setError(''); setShowCreate(true) }}>
-              <span className="button-plus" aria-hidden="true">+</span> New story world
-            </button>
+            <div className="library-heading-actions">
+              <button className="button button-primary create-button" onClick={() => startBrief()}>
+                <span className="button-plus" aria-hidden="true">+</span> New campaign brief
+              </button>
+              <button className="button button-secondary create-button" onClick={() => { setError(''); setShowCreate(true) }}>
+                Create blank world
+              </button>
+            </div>
           </div>
 
           {error && <p className="alert" role="alert">{error}</p>}
+
+          {briefs.length > 0 && (
+            <section className="saved-briefs" aria-labelledby="saved-briefs-title">
+              <div className="saved-briefs-heading">
+                <div>
+                  <p className="card-kicker">READY WHEN YOU ARE</p>
+                  <h2 id="saved-briefs-title">Campaign briefs</h2>
+                </div>
+                <span>{briefs.length} saved {briefs.length === 1 ? 'brief' : 'briefs'}</span>
+              </div>
+              <div className="brief-grid">
+                {briefs.map((brief) => (
+                  <article className="brief-card" key={brief.id}>
+                    <div>
+                      <p className="card-kicker">{brief.genre} · {brief.campaignLengthSessions} sessions</p>
+                      <h3>{brief.title}</h3>
+                      <p>{brief.tone}</p>
+                    </div>
+                    <div className="brief-card-actions">
+                      <button className="button button-secondary" onClick={() => startBrief(brief)}>Edit brief</button>
+                      <button className="text-button delete-action" onClick={() => void discardBrief(brief)}>Discard</button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
 
           <div className="library-toolbar">
             <div className="tabs" role="tablist" aria-label="Story world status">
@@ -330,7 +582,7 @@ function App() {
                     ? 'Create a cozy world and gather your adventurers.'
                     : 'Story worlds will appear here when you need them.'}</p>
                   {activeTab === 'Active' && (
-                    <button className="button button-secondary" onClick={() => setShowCreate(true)}>Create a story world</button>
+                    <button className="button button-secondary" onClick={() => startBrief()}>Start a campaign brief</button>
                   )}
                 </div>
               )}
@@ -352,7 +604,7 @@ function App() {
             <button className="dialog-close" aria-label="Close" disabled={saving} onClick={() => setShowCreate(false)}>×</button>
             <p className="eyebrow">A brand-new beginning</p>
             <h2 id="create-title">Name your story world</h2>
-            <p className="dialog-intro">Give your adventure a name and a little hint of what makes it special.</p>
+            <p className="dialog-intro">Create an empty story world without a campaign-generation brief.</p>
             <form onSubmit={(event) => void createCampaign(event)}>
               <label htmlFor="campaign-name">Story world name</label>
               <input id="campaign-name" name="name" maxLength={120} required autoFocus placeholder="The Moonlit Woods" />

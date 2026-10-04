@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Storykeeper.Api.Data;
 using Storykeeper.Api.Contracts;
+using Storykeeper.Api.Domain;
 using Storykeeper.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,6 +13,7 @@ builder.Services.AddDbContext<StorykeeperDbContext>(options => options.UseSqlite
 builder.Services.AddScoped<ICampaignRepository, CampaignRepository>();
 builder.Services.AddScoped<ICampaignEntityRepository, CampaignEntityRepository>();
 builder.Services.AddScoped<ICampaignService, CampaignService>();
+builder.Services.AddScoped<ICampaignBriefService, CampaignBriefService>();
 
 var app = builder.Build();
 
@@ -25,6 +27,55 @@ app.MapGet("/api/health", () => Results.Ok(new { status = "Healthy" }));
 
 app.MapGet("/api/campaigns", async (ICampaignService campaigns, CancellationToken cancellationToken) =>
     Results.Ok((await campaigns.ListAsync(cancellationToken)).Select(CampaignResponse.From)));
+
+app.MapGet("/api/campaign-briefs", async (ICampaignBriefService briefs, CancellationToken cancellationToken) =>
+    Results.Ok((await briefs.ListAsync(cancellationToken)).Select(CampaignBriefResponse.From)));
+
+app.MapPost("/api/campaign-briefs", async (
+    CampaignBriefRequest? request,
+    ICampaignBriefService briefs,
+    CancellationToken cancellationToken) =>
+{
+    var errors = CampaignBriefRequestValidator.Validate(request);
+    if (errors.Count > 0)
+    {
+        return Results.ValidationProblem(errors);
+    }
+
+    var brief = await briefs.CreateAsync(request!.ToDomain(), cancellationToken);
+    return Results.Created($"/api/campaign-briefs/{brief.Id}", CampaignBriefResponse.From(brief));
+});
+
+app.MapGet("/api/campaign-briefs/{briefId:guid}", async (
+    Guid briefId,
+    ICampaignBriefService briefs,
+    CancellationToken cancellationToken) =>
+{
+    var brief = await briefs.GetAsync(briefId, cancellationToken);
+    return brief is null ? Results.NotFound() : Results.Ok(CampaignBriefResponse.From(brief));
+});
+
+app.MapPut("/api/campaign-briefs/{briefId:guid}", async (
+    Guid briefId,
+    CampaignBriefRequest? request,
+    ICampaignBriefService briefs,
+    CancellationToken cancellationToken) =>
+{
+    var errors = CampaignBriefRequestValidator.Validate(request);
+    if (errors.Count > 0)
+    {
+        return Results.ValidationProblem(errors);
+    }
+
+    var brief = await briefs.UpdateAsync(briefId, request!.ToDomain(), cancellationToken);
+    return brief is null ? Results.NotFound() : Results.Ok(CampaignBriefResponse.From(brief));
+});
+
+app.MapDelete("/api/campaign-briefs/{briefId:guid}", async (
+    Guid briefId,
+    ICampaignBriefService briefs,
+    CancellationToken cancellationToken) =>
+    await briefs.DeleteAsync(briefId, cancellationToken) ? Results.NoContent() : Results.NotFound());
 
 app.MapPost("/api/campaigns", async (
     CreateCampaignRequest? request,

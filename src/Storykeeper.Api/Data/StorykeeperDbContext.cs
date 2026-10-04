@@ -1,12 +1,20 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Storykeeper.Api.Domain;
+using System.Text.Json;
 
 namespace Storykeeper.Api.Data;
 
 public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> options) : DbContext(options)
 {
+    private static readonly ValueComparer<List<string>> StringListComparer = new(
+        (left, right) => left!.SequenceEqual(right!),
+        value => value!.Aggregate(0, (hash, item) => HashCode.Combine(hash, item.GetHashCode())),
+        value => value!.ToList());
+
     public DbSet<Campaign> Campaigns => Set<Campaign>();
+    public DbSet<CampaignBrief> CampaignBriefs => Set<CampaignBrief>();
     public DbSet<CampaignSettings> CampaignSettings => Set<CampaignSettings>();
     public DbSet<CampaignBible> CampaignBibles => Set<CampaignBible>();
     public DbSet<Party> Parties => Set<Party>();
@@ -22,6 +30,27 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<CampaignBrief>(entity =>
+        {
+            entity.HasKey(brief => brief.Id);
+            entity.Property(brief => brief.Title).HasMaxLength(120).IsRequired();
+            entity.Property(brief => brief.Genre).HasMaxLength(100).IsRequired();
+            entity.Property(brief => brief.Tone).HasMaxLength(300).IsRequired();
+            entity.Property(brief => brief.StoryIdea).HasMaxLength(2000);
+            entity.Property(brief => brief.Inclusions)
+                .HasConversion(values => JsonSerializer.Serialize(values, (JsonSerializerOptions?)null),
+                    value => JsonSerializer.Deserialize<List<string>>(value, (JsonSerializerOptions?)null) ?? new List<string>())
+                .Metadata.SetValueComparer(StringListComparer);
+            entity.Property(brief => brief.Exclusions)
+                .HasConversion(values => JsonSerializer.Serialize(values, (JsonSerializerOptions?)null),
+                    value => JsonSerializer.Deserialize<List<string>>(value, (JsonSerializerOptions?)null) ?? new List<string>())
+                .Metadata.SetValueComparer(StringListComparer);
+            entity.Property(brief => brief.SafetyBoundaries)
+                .HasConversion(values => JsonSerializer.Serialize(values, (JsonSerializerOptions?)null),
+                    value => JsonSerializer.Deserialize<List<string>>(value, (JsonSerializerOptions?)null) ?? new List<string>())
+                .Metadata.SetValueComparer(StringListComparer);
+        });
+
         modelBuilder.Entity<Campaign>(entity =>
         {
             entity.HasKey(campaign => campaign.Id);
