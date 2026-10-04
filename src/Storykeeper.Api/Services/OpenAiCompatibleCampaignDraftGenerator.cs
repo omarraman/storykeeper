@@ -12,7 +12,8 @@ public sealed class OpenAiCompatibleCampaignDraftGenerator(
     IOptions<StorykeeperAiOptions> options,
     ILogger<OpenAiCompatibleCampaignDraftGenerator> logger) : ICampaignDraftGenerator
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    private static readonly JsonSerializerOptions ProviderJsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions DraftJsonOptions = new(JsonSerializerDefaults.Web)
     {
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
     };
@@ -76,10 +77,10 @@ public sealed class OpenAiCompatibleCampaignDraftGenerator(
                         brief.Exclusions,
                         brief.StoryIdea,
                         brief.SafetyBoundaries
-                    }, JsonOptions)
+                    }, ProviderJsonOptions)
                 }
             }
-        }, JsonOptions), Encoding.UTF8, "application/json");
+        }, ProviderJsonOptions), Encoding.UTF8, "application/json");
 
         HttpResponseMessage response;
         try
@@ -106,7 +107,7 @@ public sealed class OpenAiCompatibleCampaignDraftGenerator(
             ProviderResponse? result;
             try
             {
-                result = await response.Content.ReadFromJsonAsync<ProviderResponse>(JsonOptions, cancellationToken);
+                result = await response.Content.ReadFromJsonAsync<ProviderResponse>(ProviderJsonOptions, cancellationToken);
             }
             catch (JsonException exception)
             {
@@ -121,7 +122,7 @@ public sealed class OpenAiCompatibleCampaignDraftGenerator(
 
             try
             {
-                return JsonSerializer.Deserialize<CampaignDraftContent>(content, JsonOptions)
+                return JsonSerializer.Deserialize<CampaignDraftContent>(content, DraftJsonOptions)
                     ?? throw new CampaignDraftGenerationException(502, "The AI service returned an empty campaign draft.");
             }
             catch (JsonException exception)

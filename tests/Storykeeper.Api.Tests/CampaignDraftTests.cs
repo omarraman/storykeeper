@@ -154,9 +154,22 @@ public sealed class CampaignDraftTests
         var expected = ValidContent();
         var responseJson = JsonSerializer.Serialize(new
         {
+            id = "chatcmpl-example",
+            @object = "chat.completion",
+            created = 1_728_000_000,
+            model = "family-safe-model",
             choices = new[]
             {
-                new { message = new { content = JsonSerializer.Serialize(expected, new JsonSerializerOptions(JsonSerializerDefaults.Web)) } }
+                new
+                {
+                    index = 0,
+                    message = new
+                    {
+                        role = "assistant",
+                        content = JsonSerializer.Serialize(expected, new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                    },
+                    finish_reason = "stop"
+                }
             }
         });
         var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
@@ -180,6 +193,39 @@ public sealed class CampaignDraftTests
         Assert.Equal(3, content.Npcs!.Count);
         Assert.Equal("https://example.test/v1/chat/completions", handler.RequestUri!.AbsoluteUri);
         Assert.Equal("Bearer server-only-test-key", handler.Authorization);
+    }
+
+    [Fact]
+    public async Task OpenAiCompatibleGeneratorRejectsUnknownDraftProperties()
+    {
+        var content = JsonSerializer.Serialize(ValidContent(), new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var contentWithUnknownProperty = $"{content[..^1]},\"unexpected\":true}}";
+        var responseJson = JsonSerializer.Serialize(new
+        {
+            choices = new[]
+            {
+                new { message = new { content = contentWithUnknownProperty } }
+            }
+        });
+        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(responseJson)
+        });
+        using var client = new HttpClient(handler);
+        var generator = new OpenAiCompatibleCampaignDraftGenerator(
+            client,
+            Options.Create(new StorykeeperAiOptions
+            {
+                BaseUrl = "https://example.test/v1",
+                Model = "family-safe-model",
+                ApiKey = "server-only-test-key"
+            }),
+            NullLogger<OpenAiCompatibleCampaignDraftGenerator>.Instance);
+
+        var exception = await Assert.ThrowsAsync<CampaignDraftGenerationException>(
+            () => generator.GenerateAsync(new CampaignBrief { Title = "My world" }));
+
+        Assert.Equal(502, exception.StatusCode);
     }
 
     private static CampaignDraftContent ValidContent() => new(
