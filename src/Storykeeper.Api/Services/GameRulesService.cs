@@ -25,6 +25,7 @@ public sealed class GameRulesService(StorykeeperDbContext dbContext) : IGameRule
             .Include(item => item.Party)
                 .ThenInclude(party => party!.Heroes)
             .Include(item => item.Sessions)
+            .Include(item => item.Quests)
             .SingleOrDefaultAsync(item => item.Id == campaignId, cancellationToken);
         if (campaign is null)
         {
@@ -53,6 +54,8 @@ public sealed class GameRulesService(StorykeeperDbContext dbContext) : IGameRule
         {
             CampaignId = campaignId,
             SessionNumber = campaign.Sessions.Select(item => item.SessionNumber).DefaultIfEmpty(0).Max() + 1,
+            Title = campaign.Quests.FirstOrDefault(quest => quest.Status == QuestStatus.InProgress)?.Title
+                ?? $"Adventure {campaign.Sessions.Select(item => item.SessionNumber).DefaultIfEmpty(0).Max() + 1}",
             StartedAtUtc = now
         };
         dbContext.Sessions.Add(session);

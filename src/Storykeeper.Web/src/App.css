@@ -718,6 +718,125 @@ select:focus-visible {
   white-space: pre-wrap;
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+.storybook-panel {
+  margin-top: 22px;
+  padding: clamp(23px, 4vw, 36px);
+  border: 1px solid #e9e3d7;
+  border-radius: 20px;
+  background: #fffdf8;
+  box-shadow: 0 13px 34px #324c3a0a;
+}
+
+.storybook-heading,
+.storybook-session-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.storybook-heading h2 {
+  margin: 9px 0;
+  color: #2b4539;
+  font-family: var(--serif);
+  font-size: 1.8rem;
+  font-weight: 500;
+}
+
+.storybook-heading p:not(.card-kicker),
+.storybook-empty {
+  margin: 0;
+  color: #68746a;
+  line-height: 1.65;
+}
+
+.storybook-sessions {
+  display: grid;
+  gap: 14px;
+  margin: 25px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.storybook-session {
+  padding: 22px;
+  border: 1px solid #e9e3d7;
+  border-radius: 15px;
+  background: #fffefa;
+}
+
+.storybook-session-heading h3,
+.storybook-rewards h3 {
+  margin: 7px 0 0;
+  color: #2b4539;
+  font-family: var(--serif);
+  font-size: 1.35rem;
+  font-weight: 500;
+}
+
+.storybook-session-heading time {
+  color: #68746a;
+  font-size: 0.9rem;
+}
+
+.storybook-summary {
+  margin: 17px 0 0;
+  color: #495a4d;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.storybook-highlights {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.storybook-highlights h4 {
+  margin: 0 0 8px;
+  color: #344f41;
+  font-size: 0.92rem;
+}
+
+.storybook-highlights ul,
+.storybook-rewards ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 20px;
+  color: #68746a;
+  line-height: 1.55;
+}
+
+.storybook-rewards {
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid #e9e3d7;
+}
+
+.storybook-rewards ul {
+  margin-top: 14px;
+}
+
+.storybook-rewards li > span:last-child {
+  font-size: 0.85rem;
+}
+
+.storybook-rewards li p {
+  margin: 4px 0;
+}
+
 .continuity-panel {
   min-height: 0;
   margin-top: 22px;
@@ -1122,6 +1241,16 @@ select:focus-visible {
   }
 
   .room-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .storybook-heading,
+  .storybook-session-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .storybook-highlights {
     grid-template-columns: 1fr;
   }
 

@@ -24,6 +24,16 @@ with `POST /api/campaigns/{id}/complete`, archives them with
 The selected campaign ID is a browser preference in local storage; campaign
 facts and saved story state remain server-side in SQLite.
 
+Campaign rooms load chronological Storybook entries from
+`GET /api/campaigns/{campaignId}/storybook`. `GET
+/api/campaigns/{campaignId}/export` serializes an explicit campaign-data
+allowlist as the versioned JSON archive documented in
+[Storybook history and campaign export](storybook-and-campaign-export.md).
+`POST /api/campaigns/import` validates the format, safety, lengths, IDs, and
+campaign-scoped references before restoring all included rows in one
+transaction. The archive excludes provider credentials and server
+configuration; import is a separate copy, not a merge.
+
 The game-rules service owns session resource resets and check resolution.
 `POST /api/campaigns/{id}/sessions` starts a session and resets heroes to 3
 hearts and 1 sparkle token. Checks are submitted to

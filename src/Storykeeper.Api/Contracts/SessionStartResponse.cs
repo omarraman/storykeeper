@@ -6,6 +6,7 @@ public sealed record SessionStartResponse(
     Guid Id,
     Guid CampaignId,
     int SessionNumber,
+    string Title,
     DateTimeOffset StartedAtUtc,
     IReadOnlyList<SessionHeroStateResponse> Heroes)
 {
@@ -14,6 +15,7 @@ public sealed record SessionStartResponse(
             session.Id,
             session.CampaignId,
             session.SessionNumber,
+            session.Title,
             session.StartedAtUtc,
             heroes.Select(hero => new SessionHeroStateResponse(
                 hero.Id,

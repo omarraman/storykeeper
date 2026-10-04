@@ -27,6 +27,13 @@ validates the hero, session, die result, strength, sparkle token, and outcome,
 then persists the resource changes. The UI refreshes and displays those
 server-returned values; it does not resolve the check.
 
+The server titles a new session with the active quest title, or `Adventure N`
+if there is no active quest. The campaign room's Storybook displays sessions
+chronologically with their factual summaries, high-importance discoveries,
+strong-success hero moments, and campaign or completed-adventure rewards.
+Campaign Storybook history and the versioned JSON backup/restore contract are
+documented in [Storybook history and campaign export](storybook-and-campaign-export.md).
+
 An activated, parent-reviewed adventure plan is saved with its current quest.
 The server includes that plan in live narration context to guide the episode's
 opening, scenes, clues, routes, and gentle finale without limiting player

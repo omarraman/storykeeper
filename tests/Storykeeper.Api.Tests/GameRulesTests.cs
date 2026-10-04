@@ -70,6 +70,26 @@ public sealed class GameRulesTests
     }
 
     [Fact]
+    public async Task NewSessionTakesItsTitleFromTheActiveQuest()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var (campaign, _) = await CreateCampaignWithHeroAsync(database.Context);
+        database.Context.Quests.Add(new Quest
+        {
+            CampaignId = campaign.Id,
+            Title = "The Lantern Song",
+            Description = "Find the garden's missing tune.",
+            Status = QuestStatus.InProgress
+        });
+        await database.Context.SaveChangesAsync();
+
+        var session = (await new GameRulesService(database.Context).StartSessionAsync(campaign.Id)).Session;
+
+        Assert.NotNull(session);
+        Assert.Equal("The Lantern Song", session.Title);
+    }
+
+    [Fact]
     public async Task ListedStrengthAddsTwoAndUnlistedStrengthIsRejected()
     {
         await using var database = await TestDatabase.CreateAsync();

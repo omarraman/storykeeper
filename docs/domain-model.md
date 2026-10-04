@@ -32,11 +32,12 @@ campaign's party, hero, location, or session.
 - `AdventureDraft` stores one campaign-scoped episode plan, its parent pacing
   preferences, generation number, review status, and the quest created when
   activated. Drafts and their activated quest links cannot cross campaigns.
-- `Session` stores its sequence number, UTC start/end times, and optional
-  factual summary. Starting a session resets each hero to 3 hearts and 1
-  sparkle token. It also stores a parent pause flag and one-turn narration
-  direction. A running session must be summarized before another session can
-  start.
+- `Session` stores its sequence number, title, UTC start/end times, and optional
+  factual summary. Its title is the active quest title at session start, or
+  `Adventure N` when no quest is active. Starting a session resets each hero
+  to 3 hearts and 1 sparkle token. It also stores a parent pause flag and
+  one-turn narration direction. A running session must be summarized before
+  another session can start.
 - `CheckResolution` records a server-calculated d20 result, its session and
   hero, the difficulty and bonuses, the outcome band, the forward-progress
   requirement, and before/after heart and sparkle-token counts. Composite
@@ -76,6 +77,12 @@ permanently deleted.
 Campaign archival preserves all campaign data. Archived campaigns remain
 loadable for save/resume history but cannot be updated through the campaign
 service.
+
+Storybook history is derived from campaign sessions and their source-linked
+facts and check resolutions, together with campaign rewards and celebration
+rewards from completed adventure plans. JSON campaign archives preserve the
+campaign-owned continuity entities and their identifiers; campaign brief
+authoring drafts and provider/server configuration are deliberately excluded.
 
 Campaign deletion is permanent and removes its campaign-owned records. The
 selector requires an explicit confirmation before requesting deletion.

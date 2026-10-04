@@ -33,6 +33,8 @@ Current implementation focus:
   tokens, and forward-progress outcomes.
 - Campaign-scoped continuity with parent-curated session summaries, reviewable
   facts, relevance-selected prompt context, and an edit audit trail.
+- Chronological campaign storybooks with discoveries, hero milestones, rewards,
+  and validated JSON backup/restore.
 - PIN-gated parent safety settings and live story redirects, enforced by the
   API across generation and narration.
 - Text-first, tablet-first play before optional voice interaction.
@@ -58,6 +60,7 @@ Current implementation focus:
 | [Domain model](docs/domain-model.md) | Campaigns, heroes, NPCs, facts, quests, sessions, and inventory | Available |
 | [Game rules](docs/game-rules.md) | Child-friendly d20 rules, hearts, sparkle tokens, and consequences | Available |
 | [Adventure play](docs/adventure-play.md) | Play screen, session wrap-up, parent continuity controls, typed turn-client boundary, and authoritative roll integration | Available |
+| [Storybook history and campaign export](docs/storybook-and-campaign-export.md) | Campaign storybook history, versioned JSON archive format, and safe restore behavior | Available |
 | [Campaign generation](docs/campaign-generation.md) | CampaignBrief wizard, validated generation, approval, activation, and bible versions | Available |
 | [Next playable adventures](docs/next-adventures.md) | Session-length preferences, continuity-aware episode plans, parent review, and quest activation | Available |
 | [AI Storykeeper](docs/ai-storykeeper.md) | Prompting, schemas, turn processing, validation, and relevance-selected continuity | Available |

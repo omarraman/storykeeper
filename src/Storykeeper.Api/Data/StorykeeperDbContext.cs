@@ -206,6 +206,7 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
         }, campaignNavigation: campaign => campaign.Quests);
         ConfigureCampaignEntity<Session>(modelBuilder, entity =>
         {
+            entity.Property(session => session.Title).HasMaxLength(160).IsRequired();
             entity.Property(session => session.Summary).HasMaxLength(4000);
             entity.Property(session => session.ParentInstruction).HasMaxLength(300);
             entity.HasIndex(session => new { session.CampaignId, session.SessionNumber }).IsUnique();

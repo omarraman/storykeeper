@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { request } from './api/request'
 import { AdventureDraftPanel } from './adventure/AdventureDraftPanel'
 import { AdventurePlayScreen } from './adventure/AdventurePlayScreen'
 import { CampaignContinuityPanel } from './adventure/CampaignContinuityPanel'
 import { ParentControlsPanel, type ParentSafetySettings } from './adventure/ParentControlsPanel'
+import { CampaignStorybookPanel } from './storybook/CampaignStorybookPanel'
 import { adventureTurnClient } from './adventure/client'
 import { PwaInstallControl } from './PwaInstallControl'
 import type { AdventureCampaign, SessionStartResponse } from './adventure/contracts'
@@ -142,6 +143,7 @@ type Quest = {
 type Session = {
   id: string
   sessionNumber: number
+  title: string
   startedAtUtc: string
   endedAtUtc: string | null
   summary: string | null
@@ -171,6 +173,7 @@ function App() {
   const [wizardStep, setWizardStep] = useState(0)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const importFileInput = useRef<HTMLInputElement>(null)
 
   const visibleCampaigns = useMemo(
     () => campaigns.filter((campaign) => campaign.status === activeTab),
@@ -556,6 +559,7 @@ function App() {
           latestSession: {
             id: session.id,
             sessionNumber: session.sessionNumber,
+            title: session.title,
             startedAtUtc: session.startedAtUtc,
             endedAtUtc: null,
             summary: null,
@@ -590,7 +594,11 @@ function App() {
             return saved ? { ...hero, hearts: saved.hearts, sparkleTokens: saved.sparkleTokens } : hero
           }),
           latestSession: updated.latestSession
-            ? { ...updated.latestSession, isPaused: updated.latestSession.isPaused ?? current.latestSession?.isPaused ?? false }
+            ? {
+                ...updated.latestSession,
+                title: current.latestSession?.title ?? `Adventure ${updated.latestSession.sessionNumber}`,
+                isPaused: updated.latestSession.isPaused ?? current.latestSession?.isPaused ?? false,
+              }
             : null,
         }
       : current)
@@ -609,6 +617,27 @@ function App() {
       }
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : 'Could not delete this story world.')
+    }
+  }
+
+  const importCampaign = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!window.confirm(`Import “${file.name}” as a separate story world?`)) return
+    setSaving(true)
+    setError('')
+    try {
+      const archive: unknown = JSON.parse(await file.text())
+      const imported = await request<{ campaignId: string }>('/api/campaigns/import', {
+        method: 'POST',
+        body: JSON.stringify(archive),
+      })
+      await refreshCampaigns(imported.campaignId)
+    } catch (importError) {
+      setError(importError instanceof Error ? importError.message : 'Could not import this campaign archive.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -998,7 +1027,7 @@ function App() {
             <section className="room-panel">
               <p className="card-kicker">LAST TIME IN YOUR STORY</p>
               <h2>{selectedCampaign.latestSession
-                ? `Adventure ${selectedCampaign.latestSession.sessionNumber}`
+                ? selectedCampaign.latestSession.title || `Adventure ${selectedCampaign.latestSession.sessionNumber}`
                 : 'The first page is waiting'}</h2>
               <p>{selectedCampaign.latestSession?.summary || selectedCampaign.currentSituation || 'Your world is saved here, ready whenever your family wants to play.'}</p>
               {selectedCampaign.currentQuest && (
@@ -1032,6 +1061,7 @@ function App() {
               )}
             </section>
           </div>
+          <CampaignStorybookPanel key={selectedCampaign.id} campaignId={selectedCampaign.id} />
           <ParentControlsPanel
             campaignId={selectedCampaign.id}
             settings={selectedCampaign.safetySettings}
@@ -1060,6 +1090,13 @@ function App() {
               <p className="intro">Every adventure stays safe in its own storybook. Pick up where you left off, or start somewhere new.</p>
             </div>
             <div className="library-heading-actions">
+              <button className="button button-secondary create-button" disabled={saving}
+                onClick={() => importFileInput.current?.click()}>
+                {saving ? 'Importing…' : 'Import campaign'}
+              </button>
+              <input ref={importFileInput} className="visually-hidden" type="file"
+                accept="application/json,.json" aria-label="Choose a Storykeeper campaign archive"
+                onChange={(event) => void importCampaign(event)} />
               <button className="button button-primary create-button" onClick={() => startBrief()}>
                 <span className="button-plus" aria-hidden="true">+</span> New campaign brief
               </button>

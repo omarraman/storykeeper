@@ -109,11 +109,13 @@ public sealed record QuestResponse(
 public sealed record SessionResponse(
     Guid Id,
     int SessionNumber,
+    string Title,
     DateTimeOffset StartedAtUtc,
     DateTimeOffset? EndedAtUtc,
     string? Summary,
     bool IsPaused)
 {
     public static SessionResponse From(Session session) =>
-        new(session.Id, session.SessionNumber, session.StartedAtUtc, session.EndedAtUtc, session.Summary, session.IsPaused);
+        new(session.Id, session.SessionNumber, session.Title, session.StartedAtUtc,
+            session.EndedAtUtc, session.Summary, session.IsPaused);
 }

@@ -33,6 +33,7 @@ builder.Services.AddDbContext<StorykeeperDbContext>(options => options.UseSqlite
 builder.Services.AddScoped<ICampaignRepository, CampaignRepository>();
 builder.Services.AddScoped<ICampaignEntityRepository, CampaignEntityRepository>();
 builder.Services.AddScoped<ICampaignService, CampaignService>();
+builder.Services.AddScoped<CampaignArchiveService>();
 builder.Services.AddScoped<IGameRulesService, GameRulesService>();
 builder.Services.AddScoped<ICampaignBriefService, CampaignBriefService>();
 builder.Services.AddScoped<ICampaignContinuityService, CampaignContinuityService>();
@@ -66,6 +67,71 @@ await using (var scope = app.Services.CreateAsyncScope())
 }
 
 app.MapGet("/api/health", () => Results.Ok(new { status = "Healthy" }));
+
+var archiveJsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+{
+    UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
+};
+archiveJsonOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false));
+
+app.MapPost("/api/campaigns/import", async (
+    JsonElement request,
+    CampaignArchiveService archives,
+    CancellationToken cancellationToken) =>
+{
+    CampaignArchiveDocument? archive;
+    try
+    {
+        archive = request.Deserialize<CampaignArchiveDocument>(archiveJsonOptions);
+    }
+    catch (JsonException exception)
+    {
+        return Results.ValidationProblem(
+            new Dictionary<string, string[]> { ["archive"] = [$"The archive JSON is invalid: {exception.Message}"] },
+            title: "Campaign archive could not be read");
+    }
+
+    var result = await archives.ImportAsync(archive, cancellationToken);
+    if (result.Errors.Count > 0)
+    {
+        return Results.ValidationProblem(
+            result.Errors,
+            statusCode: result.Conflict ? StatusCodes.Status409Conflict : StatusCodes.Status400BadRequest,
+            title: result.Conflict ? "Campaign archive conflicts with saved data" : "Campaign archive is invalid");
+    }
+
+    return Results.Created($"/api/campaigns/{result.CampaignId}", new { campaignId = result.CampaignId });
+});
+
+app.MapGet("/api/campaigns/{campaignId:guid}/export", async (
+    Guid campaignId,
+    CampaignArchiveService archives,
+    CancellationToken cancellationToken) =>
+{
+    var archive = await archives.ExportAsync(campaignId, cancellationToken);
+    if (archive is null)
+    {
+        return Results.NotFound();
+    }
+
+    var fileName = string.Concat(
+        archive.Campaign.Name.ToLowerInvariant()
+            .Select(character => char.IsLetterOrDigit(character) ? character : '-'))
+        .Trim('-');
+    return Results.File(
+        JsonSerializer.SerializeToUtf8Bytes(archive, archiveJsonOptions),
+        "application/json",
+        $"{(string.IsNullOrEmpty(fileName) ? "campaign" : fileName)}-storykeeper.json");
+});
+
+app.MapGet("/api/campaigns/{campaignId:guid}/storybook", async (
+    Guid campaignId,
+    CampaignArchiveService archives,
+    CancellationToken cancellationToken) =>
+{
+    var storybook = await archives.GetStorybookAsync(campaignId, cancellationToken);
+    return storybook is null ? Results.NotFound() : Results.Ok(storybook);
+});
 
 app.MapPost("/api/parent-controls/verify", (HttpRequest httpRequest, IConfiguration configuration) =>
 {

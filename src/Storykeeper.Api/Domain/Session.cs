@@ -3,6 +3,7 @@ namespace Storykeeper.Api.Domain;
 public sealed class Session : CampaignEntity
 {
     public int SessionNumber { get; set; }
+    public string Title { get; set; } = "Adventure";
     public DateTimeOffset StartedAtUtc { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? EndedAtUtc { get; set; }
     public string? Summary { get; set; }

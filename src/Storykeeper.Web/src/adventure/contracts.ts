@@ -130,6 +130,7 @@ export interface AdventureCampaign {
   latestSession: {
     id: string
     sessionNumber: number
+    title?: string
     startedAtUtc: string
     endedAtUtc: string | null
     summary: string | null
@@ -141,6 +142,7 @@ export interface SessionStartResponse {
   id: string
   campaignId: string
   sessionNumber: number
+  title: string
   startedAtUtc: string
   heroes: { heroId: string; heroName: string; hearts: number; sparkleTokens: number }[]
 }
