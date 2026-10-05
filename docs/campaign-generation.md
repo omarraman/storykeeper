@@ -37,8 +37,9 @@ option to create an empty world without a brief.
 The API sends a saved brief to a server-side OpenAI-compatible Chat Completions
 endpoint. Its system prompt targets a warm, funny, low-fright adventure for
 children aged 8 and 10, and preserves player agency and forward-moving
-setbacks. The provider response must be a JSON object deserializable to
-`CampaignDraftContent`; unknown fields are rejected. A draft must contain a
+setbacks. The API requests text output for compatibility with local providers,
+then requires a JSON object deserializable to `CampaignDraftContent`; unknown
+fields are rejected. A draft must contain a
 title, premise, central mystery, 3-6 world rules, 3-5 distinct recurring NPCs,
 3-6 distinct locations, and 1-4 adventure hooks. NPCs may name a location
 only if it matches a location in the same draft. Text lengths are bounded.

@@ -31,6 +31,14 @@ is optional and defaults to 60; valid values are 10-180. Non-loopback
 endpoints must use HTTPS. Store the API key in a server environment or secret
 manager, never in Vite variables or browser storage.
 
+For LM Studio's local server, use a base URL such as
+`http://localhost:1234/v1` and the exact model ID shown by its `/v1/models`
+endpoint. The API requests text output and parses and validates the expected
+JSON shape server-side, which supports compatible servers that reject the
+`json_object` response format. LM Studio may accept a placeholder API key such
+as `local-dev` when authentication is disabled; the API still requires a
+non-empty key setting.
+
 For Docker Compose, set `STORYKEEPER_AI_BASE_URL`, `STORYKEEPER_AI_MODEL`,
 `STORYKEEPER_AI_API_KEY`, and optionally `STORYKEEPER_AI_TIMEOUT_SECONDS` in
 the untracked `.env` file. Generation remains unavailable if the provider

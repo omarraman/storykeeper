@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AdventurePlayScreen } from '../src/adventure/AdventurePlayScreen'
 import { CampaignContinuityPanel } from '../src/adventure/CampaignContinuityPanel'
+import { adventureTurnClient } from '../src/adventure/client'
 import type { CampaignContinuityClient } from '../src/adventure/continuityClient'
 import { DemoAdventureTurnClient } from '../src/adventure/demoAdventureTurnClient'
 import type {
@@ -97,6 +98,38 @@ function createClient(overrides: Partial<AdventureTurnClient> = {}): AdventureTu
 }
 
 describe('AdventurePlayScreen', () => {
+  it('opens real campaigns with their own situation and approved quest introduction', () => {
+    const contextualCampaign: AdventureCampaign = {
+      ...campaign,
+      currentSituation: 'The moonlit woods have lost their glow.',
+      currentQuest: {
+        ...campaign.currentQuest!,
+        adventureOpening: {
+          opening: 'A tiny lantern drifts beside a mossy path.',
+          featuredNpc: {
+            name: 'Mira',
+            description: 'the friendly mapmaker of the woods.',
+            disposition: 'She is eager to help.',
+          },
+        },
+      },
+    }
+
+    const opening = adventureTurnClient.openTurn(contextualCampaign, 'session-1')
+
+    expect(opening.type).toBe('story_beat')
+    if (opening.type !== 'story_beat') throw new Error('Expected an opening story beat.')
+    expect(opening.storyBeat.narration).toContain('The moonlit woods have lost their glow.')
+    expect(opening.storyBeat.narration).toContain('A tiny lantern drifts beside a mossy path.')
+    expect(opening.storyBeat.narration).toContain('Mira is the friendly mapmaker of the woods.')
+    expect(opening.storyBeat.narration).not.toContain('Cloverhill Meadow')
+    expect(opening.storyBeat.suggestedChoices).toContainEqual({
+      id: 'ask-featured-npc',
+      text: 'Ask Mira what they know',
+    })
+    expect(opening.state).toMatchObject({ mode: 'campaign', clues: [] })
+  })
+
   it('shows no more than four suggested choices and always offers free text', () => {
     render(
       <AdventurePlayScreen
@@ -115,6 +148,154 @@ describe('AdventurePlayScreen', () => {
     expect(screen.getByRole('button', { name: 'We have another idea!' })).toBeTruthy()
     expect(screen.getByText('Find the lantern')).toBeTruthy()
     expect(screen.getByText('The map is folded like a boat.')).toBeTruthy()
+  })
+
+  it('explains that the single preview hero is already selected and marks it as a demo', () => {
+    render(
+      <AdventurePlayScreen
+        campaign={{ ...campaign, heroes: [] }}
+        sessionId="session-1"
+        client={new DemoAdventureTurnClient()}
+        onCampaignChange={vi.fn()}
+        onBack={vi.fn()}
+      />,
+    )
+
+    const pipCard = screen.getByRole('button', { name: /Pip/ })
+    expect(pipCard.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByText('This demo hero is already selected for the preview.')).toBeTruthy()
+    expect(screen.getByText('Demo hero').closest('button')).toBe(pipCard)
+    expect(screen.getByText('DEMO PREVIEW - NOT SAVED')).toBeTruthy()
+    expect(screen.getByText(/Mira, a friendly mapmaker who knows every path/)).toBeTruthy()
+  })
+
+  it('switches the selected hero when another hero is available', async () => {
+    const secondHero = { ...campaign.heroes[0], id: 'hero-2', name: 'Moss' }
+    const client = createClient({
+      openTurn: vi.fn(() => ({
+        ...openingResponse,
+        state: { ...state, mode: 'preview', heroes: [...campaign.heroes, secondHero] },
+      })),
+    })
+    render(
+      <AdventurePlayScreen
+        campaign={campaign}
+        sessionId="session-1"
+        client={client}
+        onCampaignChange={vi.fn()}
+        onBack={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Moss/ }))
+    expect(screen.getByRole('button', { name: /Rowan/ }).getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByRole('button', { name: /Moss/ }).getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: 'Follow it' }))
+
+    await waitFor(() => expect(client.submitAction).toHaveBeenCalledWith(expect.objectContaining({
+      heroId: 'hero-2',
+    })))
+  })
+
+  it('dictates into editable free text only while held and submits through the normal action path', async () => {
+    let activeRecognition: MockSpeechRecognition | null = null
+    class MockSpeechRecognition {
+      onresult: ((event: { results: ArrayLike<{ 0: { transcript: string } }> }) => void) | null = null
+      onerror: ((event: { error: string }) => void) | null = null
+      onend: (() => void) | null = null
+      start = vi.fn()
+      stop = vi.fn()
+      abort = vi.fn()
+      constructor() { activeRecognition = this }
+    }
+    vi.stubGlobal('isSecureContext', true)
+    vi.stubGlobal('SpeechRecognition', MockSpeechRecognition)
+    const voiceCampaign = {
+      ...campaign,
+      safetySettings: {
+        fearLevel: 'low' as const,
+        combatMode: 'avoid' as const,
+        voiceEnabled: true,
+        excludedContent: [],
+        maxNarrationWords: 120,
+        sessionLengthMinutes: 45,
+      },
+    }
+    const client = createClient()
+    render(
+      <AdventurePlayScreen
+        campaign={voiceCampaign}
+        sessionId="session-1"
+        client={client}
+        onCampaignChange={vi.fn()}
+        onBack={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'We have another idea!' }))
+    const microphone = screen.getByRole('button', { name: 'Hold to speak' })
+    fireEvent.pointerDown(microphone)
+    expect(activeRecognition?.start).toHaveBeenCalledOnce()
+    act(() => activeRecognition?.onresult?.({
+      results: [{ 0: { transcript: 'Ask Mira about the lantern' } }],
+    }))
+    expect((screen.getByLabelText('Tell the Storykeeper your idea') as HTMLTextAreaElement).value)
+      .toBe('Ask Mira about the lantern')
+    fireEvent.pointerUp(microphone)
+    expect(activeRecognition?.stop).toHaveBeenCalledOnce()
+    act(() => activeRecognition?.onerror?.({ error: 'not-allowed' }))
+    expect(screen.getByText(/Microphone access was not allowed/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Try our idea' }))
+
+    await waitFor(() => expect(client.submitAction).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'Ask Mira about the lantern',
+    })))
+    expect(screen.getByText('A lantern floats across a sunny meadow.')).toBeTruthy()
+  })
+
+  it('plays narration with pause and stop controls and interrupts it to enter a new idea', () => {
+    const synthesis = { speak: vi.fn(), cancel: vi.fn(), pause: vi.fn(), resume: vi.fn() }
+    class MockUtterance {
+      onend: (() => void) | null = null
+      onerror: (() => void) | null = null
+      constructor(readonly text: string) {}
+    }
+    vi.stubGlobal('speechSynthesis', synthesis)
+    vi.stubGlobal('SpeechSynthesisUtterance', MockUtterance)
+    const voiceCampaign = {
+      ...campaign,
+      safetySettings: {
+        fearLevel: 'low' as const,
+        combatMode: 'avoid' as const,
+        voiceEnabled: true,
+        excludedContent: [],
+        maxNarrationWords: 120,
+        sessionLengthMinutes: 45,
+      },
+    }
+    render(
+      <AdventurePlayScreen
+        campaign={voiceCampaign}
+        sessionId="session-1"
+        client={createClient()}
+        onCampaignChange={vi.fn()}
+        onBack={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Read narration aloud' }))
+    expect(synthesis.speak).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: 'Pause narration' }))
+    expect(synthesis.pause).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: 'Resume narration' }))
+    expect(synthesis.resume).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: 'Stop narration' }))
+    expect(synthesis.cancel).toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Read narration aloud' }))
+    fireEvent.click(screen.getByRole('button', { name: 'We have another idea!' }))
+    expect(synthesis.cancel.mock.calls.length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByLabelText('Tell the Storykeeper your idea')).toBeTruthy()
   })
 
   describe('DemoAdventureTurnClient', () => {

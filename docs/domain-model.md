@@ -22,6 +22,10 @@ campaign's party, hero, location, or session.
 - `Party` groups the campaign's `Hero` records. Heroes track description,
   role, listed strengths, current-session hearts and sparkle tokens, and their
   inventory.
+- Parents can add heroes to an active campaign between sessions. The API
+  validates the hero details and requires the parent PIN; new heroes are
+  stored in that campaign's party and receive session resources when a session
+  starts.
 - `InventoryItem` belongs to one hero and stores its name, description, and
   quantity.
 - `Location` and `Npc` store campaign-scoped world details. An NPC may

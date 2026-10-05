@@ -63,8 +63,8 @@ public sealed class OpenAiCompatibleStoryTurnGenerator(
         {
             model = config.Model.Trim(),
             temperature = 0.6,
-            max_tokens = 1800,
-            response_format = new { type = "json_object" },
+            max_tokens = 2400,
+            response_format = new { type = "text" },
             messages = new[]
             {
                 new { role = "system", content = SystemPrompt },

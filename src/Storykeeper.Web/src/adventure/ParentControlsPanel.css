@@ -91,6 +91,28 @@
   resize: vertical;
 }
 
+.parent-settings-form .parent-voice-setting {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.parent-voice-setting input {
+  width: 20px;
+  min-height: 20px;
+  margin: 2px 0 0;
+  flex: 0 0 auto;
+}
+
+.parent-voice-setting > span {
+  display: grid;
+  gap: 4px;
+}
+
+.parent-voice-setting strong {
+  font-size: 0.88rem;
+}
+
 .parent-live-actions {
   display: grid;
   gap: 9px;

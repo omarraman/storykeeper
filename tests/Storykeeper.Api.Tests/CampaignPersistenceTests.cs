@@ -42,6 +42,25 @@ public sealed class CampaignPersistenceTests
     }
 
     [Fact]
+    public async Task ParentVoiceSettingDefaultsOffAndPersistsWhenEnabled()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var campaign = await new CampaignService(new CampaignRepository(database.Context))
+            .CreateAsync("Voice World", null);
+        var settings = await database.Context.CampaignSettings
+            .SingleAsync(item => item.CampaignId == campaign.Id);
+
+        Assert.False(settings.SafetySettings.VoiceEnabled);
+        settings.SafetySettings = settings.SafetySettings with { VoiceEnabled = true };
+        await database.Context.SaveChangesAsync();
+        database.Context.ChangeTracker.Clear();
+
+        var reloaded = await database.Context.CampaignSettings
+            .SingleAsync(item => item.CampaignId == campaign.Id);
+        Assert.True(reloaded.SafetySettings.VoiceEnabled);
+    }
+
+    [Fact]
     public async Task CampaignEntitiesAreReadOnlyWithinTheirOwningCampaign()
     {
         await using var database = await TestDatabase.CreateAsync();

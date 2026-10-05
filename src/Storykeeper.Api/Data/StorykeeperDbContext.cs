@@ -15,12 +15,14 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
     private static readonly ValueComparer<ParentSafetySettings> ParentSafetySettingsComparer = new(
         (left, right) => left!.FearLevel == right!.FearLevel &&
                          left.CombatMode == right.CombatMode &&
+                         left.VoiceEnabled == right.VoiceEnabled &&
                          left.MaxNarrationWords == right.MaxNarrationWords &&
                          left.SessionLengthMinutes == right.SessionLengthMinutes &&
                          left.ExcludedContent.SequenceEqual(right.ExcludedContent),
         value => HashCode.Combine(
             value!.FearLevel,
             value.CombatMode,
+            value.VoiceEnabled,
             value.MaxNarrationWords,
             value.SessionLengthMinutes,
             value.ExcludedContent.Aggregate(0, (hash, item) => HashCode.Combine(hash, item.GetHashCode()))),
@@ -303,6 +305,7 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
     {
         FearLevel = value.FearLevel,
         CombatMode = value.CombatMode,
+        VoiceEnabled = value.VoiceEnabled,
         ExcludedContent = value.ExcludedContent.ToList(),
         MaxNarrationWords = value.MaxNarrationWords,
         SessionLengthMinutes = value.SessionLengthMinutes

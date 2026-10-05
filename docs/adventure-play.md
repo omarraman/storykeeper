@@ -13,9 +13,12 @@ React consumes the typed `AdventureTurnClient` interface and the
 `error`). The view depends on shared story, hero, quest, clue, inventory, and
 roll-resolution summaries—not on fixture-specific properties. For campaigns
 with server-owned heroes, submitted suggested or free-text actions use the
-server AI turn API. Empty-world preview campaigns continue using the local
-deterministic demo adapter. The browser never receives provider credentials
-and never persists AI-proposed state.
+server AI turn API. Their opening scene uses the saved current situation and,
+when the active quest has an approved adventure plan, its opening and featured
+NPC. The campaign response deliberately omits future scenes, clues, paths, and
+the finale. Empty-world preview campaigns alone use the local deterministic
+demo adapter, whose scene is explicitly labeled as a preview. The browser
+never receives provider credentials and never persists AI-proposed state.
 
 ## Authoritative session and roll state
 
@@ -53,7 +56,38 @@ and sample state so the screen's interaction flow can be explored. Its
 physical die entry advances only the preview story: it does not calculate a
 rules outcome, spend resources, create campaign facts, or save any preview
 content. The preview scene, clues, and progression reset when the screen is
-reopened. They are not campaign continuity.
+reopened. The preview introduces Mira as part of its sample scene; she is not
+an NPC in the campaign unless that campaign separately defines her. Preview
+content is not campaign continuity.
+
+In the campaign room, a parent can add heroes before starting a session. Hero
+creation is PIN-gated and unavailable while a session is active; an empty
+party cannot start a new session. If a demo session is already active, the
+parent must end it before adding a saved hero and starting real play.
+
+Hero cards select which party member takes the next action. The first hero is
+selected by default; when there is only one hero, the screen says it is already
+selected. In empty-world preview mode, the card's “Demo hero” tag is only a
+status label, not a separate preview action.
+
+## Optional voice controls
+
+Voice input and narrated playback are enabled together by a parent in the
+PIN-gated campaign settings; the setting is off by default and is saved with the
+campaign. While entering a free-text action, a child can press and hold the
+microphone button to dictate. Recognition stops on release, and the transcript
+is placed in the editable text box for the child to review and submit. The
+browser handles its speech-recognition session while the button is held; some
+browsers may use their own speech service. The app does not upload audio to the
+Storykeeper API or expose provider credentials. Microphone access requires a
+secure browser context and may require permission.
+
+When enabled, the child can also ask the browser to read the visible narration
+aloud, pause or resume it, or stop it. Starting another idea cancels playback.
+Narration text and typed/tap actions remain available at all times. Unsupported
+browsers, denied permission, and recognition or playback errors give a
+text-first way to continue; voice transcripts and playback are not saved as
+campaign history.
 
 ## Resilience and accessibility
 

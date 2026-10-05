@@ -40,6 +40,10 @@ export interface QuestSummary {
   title: string
   description: string
   sessionLengthMinutes?: number | null
+  adventureOpening?: {
+    opening: string | null
+    featuredNpc: { name: string | null; description: string | null; disposition: string | null } | null
+  } | null
 }
 
 export type AdventureArcType = 'standalone' | 'seasonArc'
@@ -49,6 +53,7 @@ export type CombatMode = 'avoid' | 'silly' | 'storyOnly'
 export interface ParentSafetySettings {
   fearLevel: FearLevel
   combatMode: CombatMode
+  voiceEnabled: boolean
   excludedContent: string[]
   maxNarrationWords: number
   sessionLengthMinutes: number
@@ -116,6 +121,8 @@ export interface AdventureCampaign {
   id: string
   name: string
   status: 'Active' | 'Completed' | 'Archived'
+  worldDescription?: string
+  currentSituation?: string | null
   safetySettings?: ParentSafetySettings
   heroes: {
     id: string

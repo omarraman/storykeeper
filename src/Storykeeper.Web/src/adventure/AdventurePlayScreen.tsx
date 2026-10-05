@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type {
   AdventureCampaign,
   AdventureTurnClient,
@@ -9,6 +9,7 @@ import type {
 } from './contracts'
 import { campaignContinuityClient, type CampaignContinuityClient } from './continuityClient'
 import { ParentControlsPanel } from './ParentControlsPanel'
+import { supportsNarrationPlayback, useVoiceInput } from './voiceInput'
 import './AdventurePlayScreen.css'
 
 const difficultyTargets: Record<CheckDifficulty, number> = { Easy: 8, Tricky: 12, Heroic: 16 }
@@ -54,7 +55,12 @@ export function AdventurePlayScreen({
   const [summaryError, setSummaryError] = useState('')
   const [showWrapUp, setShowWrapUp] = useState(false)
   const [storyPaused, setStoryPaused] = useState(campaign.latestSession?.isPaused ?? false)
+  const [narrationState, setNarrationState] = useState<'idle' | 'speaking' | 'paused'>('idle')
+  const [playbackMessage, setPlaybackMessage] = useState('')
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
 
+  const voiceEnabled = state.mode === 'campaign' && (campaign.safetySettings?.voiceEnabled ?? false)
+  const voiceInput = useVoiceInput(voiceEnabled, setActionText)
   const pendingRoll = turn.type === 'roll_required' ? turn.rollRequired : null
   const selectedHero = state.heroes.find((hero) => hero.id === selectedHeroId) ?? state.heroes[0]
   const rollValue = Number(roll)
@@ -73,6 +79,62 @@ export function AdventurePlayScreen({
     rollValue + strengthBonus < difficultyTargets[pendingRoll.difficulty],
   )
 
+  const stopNarration = () => {
+    if (supportsNarrationPlayback()) window.speechSynthesis.cancel()
+    utteranceRef.current = null
+    setNarrationState('idle')
+  }
+
+  const speakNarration = () => {
+    if (!supportsNarrationPlayback()) {
+      setPlaybackMessage('Narrated playback is not available in this browser. The narration text is still here to read.')
+      return
+    }
+
+    stopNarration()
+    const text = [
+      storyBeat.speaker,
+      storyBeat.narration,
+      ...(storyBeat.npcDialogue ?? []).map((line) => `${line.npcName} says: ${line.text}`),
+    ].filter(Boolean).join('. ')
+    try {
+      const utterance = new SpeechSynthesisUtterance(text)
+      utterance.onend = () => {
+        if (utteranceRef.current === utterance) {
+          utteranceRef.current = null
+          setNarrationState('idle')
+        }
+      }
+      utterance.onerror = () => {
+        if (utteranceRef.current === utterance) {
+          utteranceRef.current = null
+          setNarrationState('idle')
+          setPlaybackMessage('Narrated playback stopped. The narration text is still here to read.')
+        }
+      }
+      utteranceRef.current = utterance
+      window.speechSynthesis.speak(utterance)
+      setPlaybackMessage('')
+      setNarrationState('speaking')
+    } catch {
+      utteranceRef.current = null
+      setNarrationState('idle')
+      setPlaybackMessage('Narrated playback could not start. The narration text is still here to read.')
+    }
+  }
+
+  useEffect(() => {
+    if (!voiceEnabled) {
+      if (supportsNarrationPlayback()) window.speechSynthesis.cancel()
+      utteranceRef.current = null
+      setNarrationState('idle')
+    }
+  }, [voiceEnabled])
+
+  useEffect(() => () => {
+    if (supportsNarrationPlayback()) window.speechSynthesis.cancel()
+  }, [])
+
   const submitAction = async (action: string, choiceId: string | null): Promise<boolean> => {
     if (storyPaused) {
       setError('The story is paused by a parent.')
@@ -80,6 +142,8 @@ export function AdventurePlayScreen({
     }
 
     if (!selectedHero) return false
+    stopNarration()
+    voiceInput.stopListening()
     const request = { action, choiceId, heroId: selectedHero.id }
     setLastAction(request)
     setRetryableAction(false)
@@ -244,6 +308,7 @@ export function AdventurePlayScreen({
           settings={campaign.safetySettings ?? {
             fearLevel: 'low',
             combatMode: 'avoid',
+            voiceEnabled: false,
             excludedContent: [],
             maxNarrationWords: 120,
             sessionLengthMinutes: 45,
@@ -263,9 +328,34 @@ export function AdventurePlayScreen({
 
       <div className="adventure-layout">
         <main className="adventure-scene" aria-labelledby="scene-heading">
-          <p className="card-kicker" id="scene-heading">THE STORY SO FAR</p>
+          <p className="card-kicker" id="scene-heading">
+            {state.mode === 'preview' ? 'DEMO PREVIEW - NOT SAVED' : 'THE STORY SO FAR'}
+          </p>
           {storyBeat.speaker && <p className="adventure-speaker">{storyBeat.speaker}</p>}
           <p className="adventure-narration" aria-live="polite">{storyBeat.narration}</p>
+          {voiceEnabled && (
+            <div className="narration-voice-controls" aria-label="Narration playback controls">
+              {narrationState === 'speaking' && (
+                <button type="button" className="button button-secondary" onClick={() => {
+                  window.speechSynthesis.pause()
+                  setNarrationState('paused')
+                }}>Pause narration</button>
+              )}
+              {narrationState === 'paused' && (
+                <button type="button" className="button button-secondary" onClick={() => {
+                  window.speechSynthesis.resume()
+                  setNarrationState('speaking')
+                }}>Resume narration</button>
+              )}
+              {narrationState !== 'speaking' && narrationState !== 'paused' && (
+                <button type="button" className="button button-secondary" onClick={speakNarration}>Read narration aloud</button>
+              )}
+              {narrationState !== 'idle' && (
+                <button type="button" className="text-button" onClick={stopNarration}>Stop narration</button>
+              )}
+              {playbackMessage && <span role="status">{playbackMessage}</span>}
+            </div>
+          )}
           {storyBeat.npcDialogue?.map((line, index) => (
             <p className="adventure-speaker" key={`${line.npcName}-${index}`}>
               <strong>{line.npcName}:</strong> {line.text}
@@ -299,6 +389,13 @@ export function AdventurePlayScreen({
           <section className="adventure-panel" aria-labelledby="party-heading">
             <p className="card-kicker">YOUR PARTY</p>
             <h2 id="party-heading">Choose a hero</h2>
+            {state.heroes.length === 1 && (
+              <p className="adventure-muted">
+                {state.mode === 'preview'
+                  ? 'This demo hero is already selected for the preview.'
+                  : `${selectedHero?.name} is your only available hero and is already selected.`}
+              </p>
+            )}
             {state.heroes.length ? (
               <div className="adventure-heroes">
                 {state.heroes.map((hero) => (
@@ -397,6 +494,7 @@ export function AdventurePlayScreen({
               type="button"
               disabled={busy || storyPaused}
               onClick={() => {
+                stopNarration()
                 setTurn({ type: 'story_beat', storyBeat, state })
                 setShowFreeText(true)
                 setError('')
@@ -424,7 +522,11 @@ export function AdventurePlayScreen({
               <button
                 className="button button-secondary free-text-toggle"
                 aria-expanded={showFreeText}
-                onClick={() => { setShowFreeText((visible) => !visible); setError('') }}
+                onClick={() => {
+                  stopNarration()
+                  setShowFreeText((visible) => !visible)
+                  setError('')
+                }}
                 disabled={busy || storyPaused}
               >
                 We have another idea!
@@ -442,6 +544,48 @@ export function AdventurePlayScreen({
                   disabled={busy || storyPaused}
                   autoFocus
                 />
+                {voiceEnabled && (
+                  <div className="voice-input-controls">
+                    <button
+                      className={`button ${voiceInput.listening ? 'button-primary' : 'button-secondary'}`}
+                      type="button"
+                      aria-label={voiceInput.listening ? 'Listening, release to finish' : 'Hold to speak'}
+                      aria-pressed={voiceInput.listening}
+                      disabled={busy || storyPaused}
+                      onPointerDown={(event) => {
+                        event.preventDefault()
+                        event.currentTarget.setPointerCapture?.(event.pointerId)
+                        stopNarration()
+                        setPlaybackMessage('')
+                        voiceInput.startListening()
+                      }}
+                      onPointerUp={voiceInput.stopListening}
+                      onPointerLeave={voiceInput.stopListening}
+                      onPointerCancel={voiceInput.stopListening}
+                      onLostPointerCapture={voiceInput.stopListening}
+                      onKeyDown={(event) => {
+                        if ((event.key === ' ' || event.key === 'Enter') && !event.repeat) {
+                          event.preventDefault()
+                          stopNarration()
+                          voiceInput.startListening()
+                        }
+                      }}
+                      onKeyUp={(event) => {
+                        if (event.key === ' ' || event.key === 'Enter') {
+                          event.preventDefault()
+                          voiceInput.stopListening()
+                        }
+                      }}
+                      onContextMenu={(event) => event.preventDefault()}
+                    >
+                      {voiceInput.listening ? 'Listening… release to finish' : 'Hold to speak'}
+                    </button>
+                    <p className="voice-input-guidance">
+                      Hold the button while you speak. Your browser may ask for microphone permission and may use its own speech service. You can always type your idea instead.
+                    </p>
+                    {voiceInput.message && <p className="voice-input-message" role="status">{voiceInput.message}</p>}
+                  </div>
+                )}
                 <button className="button button-primary" type="submit" disabled={busy || storyPaused || !actionText.trim()}>
                   {busy ? 'Thinking…' : 'Try our idea'}
                 </button>
@@ -495,7 +639,7 @@ function HeroCard({ hero, preview, selected, onSelect }: { hero: HeroStatus; pre
         <span>{hero.role}</span>
         <span>{'♥ '.repeat(hero.hearts)}{hero.hearts === 0 ? 'Tired, but still part of the adventure' : `${hero.hearts} hearts`} · ✦ {hero.sparkleTokens} sparkle</span>
       </span>
-      {preview && <span className="demo-hero-label">Preview</span>}
+      {preview && <span className="demo-hero-label">Demo hero</span>}
     </button>
   )
 }

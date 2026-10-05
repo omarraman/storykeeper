@@ -17,6 +17,7 @@ public sealed record ParentSafetySettings
 {
     public FearLevel FearLevel { get; init; } = FearLevel.Low;
     public CombatMode CombatMode { get; init; } = CombatMode.Avoid;
+    public bool VoiceEnabled { get; init; }
     public List<string> ExcludedContent { get; init; } = [];
     public int MaxNarrationWords { get; init; } = 120;
     public int SessionLengthMinutes { get; init; } = 45;

@@ -6,6 +6,7 @@ import { CampaignContinuityPanel } from './adventure/CampaignContinuityPanel'
 import { ParentControlsPanel, type ParentSafetySettings } from './adventure/ParentControlsPanel'
 import { CampaignStorybookPanel } from './storybook/CampaignStorybookPanel'
 import { adventureTurnClient } from './adventure/client'
+import { HeroPartyPanel } from './campaign/HeroPartyPanel'
 import { PwaInstallControl } from './PwaInstallControl'
 import type { AdventureCampaign, SessionStartResponse } from './adventure/contracts'
 import './App.css'
@@ -81,6 +82,7 @@ function newBrief(): CampaignBriefInput {
     safetySettings: {
       fearLevel: 'low',
       combatMode: 'avoid',
+      voiceEnabled: false,
       excludedContent: [],
       maxNarrationWords: 120,
       sessionLengthMinutes: 45,
@@ -604,6 +606,18 @@ function App() {
       : current)
   }
 
+  const addCampaignHero = (hero: Hero) => {
+    const campaignId = selectedCampaign?.id
+    if (!campaignId) return
+
+    setSelectedCampaign((current) => current?.id === campaignId
+      ? { ...current, heroes: [...current.heroes, hero] }
+      : current)
+    setCampaigns((current) => current.map((campaign) => campaign.id === campaignId
+      ? { ...campaign, heroes: [...campaign.heroes, hero] }
+      : campaign))
+  }
+
   const deleteCampaign = async (campaign: Campaign) => {
     if (!window.confirm(`Permanently delete “${campaign.name}” and all of its saved story data? This cannot be undone.`)) return
     setError('')
@@ -1014,7 +1028,11 @@ function App() {
             <div className="room-actions">
               {selectedCampaign.status === 'Active' && (
                 <>
-                  <button className="button button-primary" disabled={saving} onClick={() => void startOrResumeAdventure()}>
+                  <button
+                    className="button button-primary"
+                    disabled={saving || (!selectedCampaign.heroes.length && selectedCampaign.latestSession?.endedAtUtc !== null)}
+                    onClick={() => void startOrResumeAdventure()}
+                  >
                     {saving ? 'Opening…' : selectedCampaign.latestSession?.endedAtUtc === null ? 'Resume adventure' : 'Start adventure'}
                   </button>
                   <button className="text-button" onClick={() => void changeStatus(selectedCampaign, 'complete')}>Mark complete</button>
@@ -1041,25 +1059,15 @@ function App() {
                 </div>
               )}
             </section>
-            <section className="room-panel party-panel">
-              <p className="card-kicker">{selectedCampaign.partyName || 'YOUR PARTY'}</p>
-              <h2>{selectedCampaign.heroes.length ? 'Your brave heroes' : 'Heroes gather here'}</h2>
-              {selectedCampaign.heroes.length ? (
-                <div className="hero-list">
-                  {selectedCampaign.heroes.map((hero) => (
-                    <article className="hero-row" key={hero.id}>
-                      <span className="hero-avatar" aria-hidden="true">{hero.name.slice(0, 1).toUpperCase()}</span>
-                      <span className="hero-info">
-                        <strong>{hero.name}</strong>
-                        <span>{hero.role} · {hero.hearts} hearts · {hero.sparkleTokens} sparkle</span>
-                      </span>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <p>Your party and its treasures will be saved with this story world.</p>
-              )}
-            </section>
+            <HeroPartyPanel
+              key={selectedCampaign.id}
+              campaignId={selectedCampaign.id}
+              partyName={selectedCampaign.partyName}
+              heroes={selectedCampaign.heroes}
+              canManageHeroes={selectedCampaign.status === 'Active' && selectedCampaign.latestSession?.endedAtUtc !== null}
+              activeSession={selectedCampaign.latestSession?.endedAtUtc === null}
+              onHeroAdded={addCampaignHero}
+            />
           </div>
           <CampaignStorybookPanel key={selectedCampaign.id} campaignId={selectedCampaign.id} />
           <ParentControlsPanel

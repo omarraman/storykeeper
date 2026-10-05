@@ -66,7 +66,7 @@ public sealed class OpenAiCompatibleAdventureDraftGenerator(
             model = config.Model.Trim(),
             temperature = 0.7,
             max_tokens = 3500,
-            response_format = new { type = "json_object" },
+            response_format = new { type = "text" },
             messages = new[]
             {
                 new { role = "system", content = SystemPrompt },

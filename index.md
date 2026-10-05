@@ -24,10 +24,13 @@ Current implementation focus:
   editable regeneration, and activation into saved quests.
 - Tablet-friendly campaign library with create, list, complete, archive,
   delete, and saved campaign resume.
+- Parent-managed, PIN-protected hero creation for playable campaigns.
 - Installable landscape Android PWA with HTTPS production delivery and a
   cached app shell for brief connection interruptions.
 - Tablet landscape adventure-play screen with suggested and free-text actions,
   physical-d20 entry, and server-backed AI narration for playable campaigns.
+- Parent-enabled, browser-managed voice dictation and narrated playback with
+  text-first fallbacks.
 - Reusable campaign/domain model with SQLite persistence and campaign isolation.
 - Server-authoritative, child-friendly d20 checks with session hearts, sparkle
   tokens, and forward-progress outcomes.
@@ -59,7 +62,7 @@ Current implementation focus:
 | [Architecture](docs/architecture.md) | Web PWA, API, persistence, and AI integration boundaries | Available |
 | [Domain model](docs/domain-model.md) | Campaigns, heroes, NPCs, facts, quests, sessions, and inventory | Available |
 | [Game rules](docs/game-rules.md) | Child-friendly d20 rules, hearts, sparkle tokens, and consequences | Available |
-| [Adventure play](docs/adventure-play.md) | Play screen, session wrap-up, parent continuity controls, typed turn-client boundary, and authoritative roll integration | Available |
+| [Adventure play](docs/adventure-play.md) | Play screen, optional voice controls, session wrap-up, parent continuity controls, typed turn-client boundary, and authoritative roll integration | Available |
 | [Storybook history and campaign export](docs/storybook-and-campaign-export.md) | Campaign storybook history, versioned JSON archive format, and safe restore behavior | Available |
 | [Campaign generation](docs/campaign-generation.md) | CampaignBrief wizard, validated generation, approval, activation, and bible versions | Available |
 | [Next playable adventures](docs/next-adventures.md) | Session-length preferences, continuity-aware episode plans, parent review, and quest activation | Available |

@@ -23,8 +23,10 @@ provider request is made.
 The provider receives the player's action and saved story context as untrusted
 content under a stable child-safety narrator prompt.
 
-Responses use strict typed JSON with no unknown properties. A response is
-either `roll_required` with a server-validated difficulty, optional listed
+The API requests up to 2,400 completion tokens in text mode, then parses
+`message.content` as strict typed JSON with no unknown properties. Reasoning
+channels are not used as story output. A response is either `roll_required`
+with a server-validated difficulty, optional listed
 hero strength, prompt, and risk flag, or `story_beat` with narration, optional
 speaker and NPC dialogue, up to four suggested choices, and current campaign
 state. Suggested choices do not constrain the player's next free-text action.

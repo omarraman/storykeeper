@@ -921,6 +921,68 @@ app.MapGet("/api/campaigns/{campaignId:guid}", async (
         : Results.Ok(CampaignResponse.From(campaign));
 }).WithName("GetCampaign");
 
+app.MapPost("/api/campaigns/{campaignId:guid}/heroes", async (
+    Guid campaignId,
+    CreateHeroRequest? request,
+    HttpRequest httpRequest,
+    IConfiguration configuration,
+    StorykeeperDbContext dbContext,
+    ICampaignEntityRepository entities,
+    CancellationToken cancellationToken) =>
+{
+    var pinError = ValidateParentPin(httpRequest, configuration);
+    if (pinError is not null) return pinError;
+
+    var errors = CreateHeroRequestValidator.Validate(request);
+    if (errors.Count > 0)
+    {
+        return Results.ValidationProblem(errors);
+    }
+
+    var campaign = await dbContext.Campaigns
+        .Include(item => item.Party)
+        .SingleOrDefaultAsync(item => item.Id == campaignId, cancellationToken);
+    if (campaign is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (campaign.Status != CampaignStatus.Active || campaign.Party is null)
+    {
+        return Results.Problem(
+            statusCode: 409,
+            title: "Hero cannot be added",
+            detail: "Heroes can only be added to an active campaign.");
+    }
+
+    var hasActiveSession = await dbContext.Sessions.AsNoTracking()
+        .AnyAsync(item => item.CampaignId == campaignId && item.EndedAtUtc == null, cancellationToken);
+    if (hasActiveSession)
+    {
+        return Results.Problem(
+            statusCode: 409,
+            title: "Adventure is in progress",
+            detail: "End the current adventure before changing the party.");
+    }
+
+    var hero = new Hero
+    {
+        CampaignId = campaignId,
+        PartyId = campaign.Party.Id,
+        Name = request!.Name!.Trim(),
+        Description = request.Description!.Trim(),
+        Role = request.Role!.Trim(),
+        Strengths = (request.Strengths ?? [])
+            .Select(strength => strength!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList()
+    };
+    campaign.UpdatedAtUtc = DateTimeOffset.UtcNow;
+    await entities.AddAsync(campaignId, hero, cancellationToken);
+
+    return Results.Ok(HeroResponse.From(hero));
+}).RequireRateLimiting("parent-pin");
+
 app.MapPost("/api/campaigns/{campaignId:guid}/complete", async (
     Guid campaignId,
     ICampaignService campaigns,

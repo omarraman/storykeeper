@@ -185,6 +185,52 @@ public sealed class StoryTurnTests
         Assert.Equal("https://example.test/v1/chat/completions", handler.RequestUri!.AbsoluteUri);
         Assert.NotNull(handler.Authorization);
         Assert.DoesNotContain("server-only-test-key", handler.RequestBody);
+        using var requestDocument = JsonDocument.Parse(handler.RequestBody!);
+        Assert.Equal("text",
+            requestDocument.RootElement.GetProperty("response_format").GetProperty("type").GetString());
+        Assert.Equal(2400, requestDocument.RootElement.GetProperty("max_tokens").GetInt32());
+    }
+
+    [Fact]
+    public async Task ProviderRejectsReasoningOnlyResponseWhenModelRunsOutOfTokens()
+    {
+        const string privateReasoning = "Private model reasoning must not become narration.";
+        var responseContent = JsonSerializer.Serialize(new
+        {
+            choices = new[]
+            {
+                new
+                {
+                    message = new { content = "", reasoning_content = privateReasoning },
+                    finish_reason = "length"
+                }
+            },
+            usage = new
+            {
+                completion_tokens = 1800,
+                completion_tokens_details = new { reasoning_tokens = 1799 }
+            }
+        });
+        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(responseContent)
+        });
+        using var client = new HttpClient(handler);
+        var generator = new OpenAiCompatibleStoryTurnGenerator(
+            client,
+            Options.Create(new StorykeeperAiOptions
+            {
+                BaseUrl = "https://example.test/v1",
+                Model = "family-safe-model",
+                ApiKey = "server-only-test-key"
+            }),
+            NullLogger<OpenAiCompatibleStoryTurnGenerator>.Instance);
+
+        var exception = await Assert.ThrowsAsync<StoryTurnGenerationException>(() =>
+            generator.GenerateAsync(new StoryTurnGenerationInput("Look around for clues", "{}")));
+
+        Assert.Equal(502, exception.StatusCode);
+        Assert.DoesNotContain(privateReasoning, exception.SafeMessage, StringComparison.Ordinal);
     }
 
     private static StoryTurnContent StoryContent(

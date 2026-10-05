@@ -16,7 +16,7 @@ import type {
 const openingBeat: StoryBeat = {
   id: 'meadow-opening',
   speaker: 'Mira the mapmaker',
-  narration: 'A little paper lantern drifts over Cloverhill Meadow, carrying a map with one corner folded into a tiny boat.',
+  narration: 'You are exploring Cloverhill Meadow with Mira, a friendly mapmaker who knows every path here. She points out a little paper lantern drifting by; a map is tucked inside, with one corner folded into a tiny boat.',
   suggestedChoices: [
     { id: 'ask-mapmaker', text: 'Ask Mira where the lantern came from' },
     { id: 'follow-lantern', text: 'Follow the floating lantern' },

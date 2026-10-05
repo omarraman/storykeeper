@@ -43,6 +43,16 @@ public sealed class ParentControlsTests
     }
 
     [Fact]
+    public void VoiceIsDisabledByDefaultAndCanBeEnabledInParentSettings()
+    {
+        Assert.False(ParentSafetySettings.Defaults.VoiceEnabled);
+
+        var settings = ParentSafetySettings.Defaults with { VoiceEnabled = true };
+
+        Assert.Empty(ParentControlsRequestValidator.Validate(settings));
+    }
+
+    [Fact]
     public void LiveNarrationEnforcesParentWordLimitAndExcludedContent()
     {
         var text = string.Join(' ', Enumerable.Repeat("gentle", 41)) + " map.";

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Storykeeper.Api.Domain;
 
 namespace Storykeeper.Api.Contracts;
@@ -95,16 +96,32 @@ public sealed record QuestResponse(
     string Title,
     string Description,
     string Status,
-    int? SessionLengthMinutes)
+    int? SessionLengthMinutes,
+    AdventureOpeningResponse? AdventureOpening)
 {
-    public static QuestResponse From(Quest quest) =>
-        new(
+    public static QuestResponse From(Quest quest)
+    {
+        var plan = quest.Status == QuestStatus.InProgress && quest.AdventurePlanJson is not null
+            ? JsonSerializer.Deserialize<AdventureDraftContent>(
+                quest.AdventurePlanJson, AdventureDraftJson.Options)
+            : null;
+        var adventureOpening = plan is null
+            ? null
+            : new AdventureOpeningResponse(plan.Opening, plan.FeaturedNpc);
+
+        return new QuestResponse(
             quest.Id,
             quest.Title,
             quest.Description,
             quest.Status.ToString(),
-            quest.SessionLengthMinutes);
+            quest.SessionLengthMinutes,
+            adventureOpening);
+    }
 }
+
+public sealed record AdventureOpeningResponse(
+    string? Opening,
+    AdventureDraftNpc? FeaturedNpc);
 
 public sealed record SessionResponse(
     Guid Id,

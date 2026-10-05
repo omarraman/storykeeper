@@ -226,6 +226,9 @@ public sealed class AdventureDraftTests
         Assert.Equal(expected.Title, generated.Title);
         Assert.Equal(AdventureArcType.Standalone, generated.ArcType);
         Assert.Equal("https://example.test/v1/chat/completions", handler.RequestUri!.AbsoluteUri);
+        using var requestDocument = JsonDocument.Parse(handler.RequestBody!);
+        Assert.Equal("text",
+            requestDocument.RootElement.GetProperty("response_format").GetProperty("type").GetString());
         Assert.StartsWith("Bearer ", handler.Authorization);
     }
 
@@ -312,14 +315,16 @@ public sealed class AdventureDraftTests
     {
         public Uri? RequestUri { get; private set; }
         public string? Authorization { get; private set; }
+        public string? RequestBody { get; private set; }
 
-        protected override Task<HttpResponseMessage> SendAsync(
+        protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
             RequestUri = request.RequestUri;
             Authorization = request.Headers.Authorization?.ToString();
-            return Task.FromResult(respond(request));
+            RequestBody = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
+            return respond(request);
         }
     }
 

@@ -45,9 +45,10 @@ campaigns, and browser-supplied story context are excluded. Parent preferences
 are untrusted input and cannot override child-safety rules. The server also
 supplies saved fright/combat preferences and excluded topics or creatures.
 
-Generated and edited content is strict typed JSON. The API bounds the
-session length and text, requires every plan component and a featured NPC used
-in a scene, limits scene/path/clue counts, and rejects unsafe or
+The API requests text output from the provider, then parses generated content
+as strict typed JSON. It bounds the session length and text, requires every
+plan component and a featured NPC used in a scene, limits scene/path/clue
+counts, and rejects unsafe or
 parent-excluded content and mandatory combat. Active facts are included in the generation prompt to avoid
 contradictions; parent review is required before activation. Provider failures
 or invalid output do not replace an existing valid draft. The provider key

@@ -7,8 +7,52 @@ const demoClient = new DemoAdventureTurnClient()
 class StorykeeperAdventureTurnClient implements AdventureTurnClient {
   private pendingAction: { action: string; choiceId: string | null; heroId: string } | null = null
 
-  openTurn(campaign: AdventureCampaign, sessionId: string): AdventureTurnResponse {
-    return demoClient.openTurn(campaign, sessionId)
+  openTurn(campaign: AdventureCampaign, _sessionId: string): AdventureTurnResponse {
+    if (campaign.heroes.length === 0) return demoClient.openTurn(campaign, _sessionId)
+
+    const quest = campaign.currentQuest
+    const adventureOpening = quest?.adventureOpening
+    const situation = campaign.currentSituation?.trim()
+    const worldDescription = campaign.worldDescription?.trim()
+    const opening = adventureOpening?.opening?.trim()
+    const questDescription = quest?.description.trim()
+    const npc = adventureOpening?.featuredNpc
+    const npcName = npc?.name?.trim()
+    const npcDescription = npc?.description?.trim()
+    const npcDisposition = npc?.disposition?.trim()
+    const context = [situation, opening].filter((part): part is string => Boolean(part))
+
+    if (context.length === 0 && questDescription) context.push(questDescription)
+    if (context.length === 0 && worldDescription) context.push(worldDescription)
+    if (context.length === 0) context.push(`Welcome to ${campaign.name}. What would you like to explore first?`)
+    if (npcName && npcDescription) {
+      context.push(`${npcName} is ${npcDescription}${npcDisposition ? ` ${npcDisposition}` : ''}`)
+    }
+
+    const choices = [
+      { id: 'look-around', text: 'Look around for clues' },
+      npcName
+        ? { id: 'ask-featured-npc', text: `Ask ${npcName} what they know` }
+        : { id: 'ask-for-help', text: 'Ask someone nearby for help' },
+      { id: 'take-a-step', text: 'Take a first step toward the quest' },
+      { id: 'make-up-an-idea', text: 'Make up your own idea' },
+    ]
+
+    return {
+      type: 'story_beat',
+      storyBeat: {
+        id: 'campaign-opening',
+        speaker: null,
+        narration: context.join(' '),
+        suggestedChoices: choices,
+      },
+      state: {
+        mode: 'campaign',
+        heroes: campaign.heroes,
+        currentQuest: quest,
+        clues: [],
+      },
+    }
   }
 
   async submitAction(input: {

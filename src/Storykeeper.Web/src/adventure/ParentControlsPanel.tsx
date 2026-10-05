@@ -166,6 +166,17 @@ export function ParentControlsPanel({
                       onChange={(event) => setForm({ ...form, sessionLengthMinutes: Number(event.target.value) })} />
                   </label>
                 </div>
+                <label className="parent-voice-setting">
+                  <input
+                    type="checkbox"
+                    checked={form.voiceEnabled}
+                    onChange={(event) => setForm({ ...form, voiceEnabled: event.target.checked })}
+                  />
+                  <span>
+                    <strong>Allow voice input and spoken narration</strong>
+                    <span>Off by default. The browser may ask for microphone permission and may use its own speech service.</span>
+                  </span>
+                </label>
                 <label htmlFor={`excluded-content-${campaignId}`}>Topics or creatures to exclude <span>(one per line, up to 20)</span></label>
                 <textarea id={`excluded-content-${campaignId}`} rows={3} maxLength={2000}
                   value={form.excludedContent.join('\n')}

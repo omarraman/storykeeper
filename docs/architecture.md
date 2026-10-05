@@ -43,6 +43,13 @@ records the result in one transaction, and returns typed, child-readable
 outcome data. The browser supplies the physical d20 value but does not
 calculate or persist the outcome.
 
+Parents create saved party members with
+`POST /api/campaigns/{campaignId}/heroes`. The API requires the parent PIN,
+validates bounded child-safe hero details, and allows party changes only for
+active campaigns between sessions. Created heroes are saved under the
+campaign's party and participate in the next session's server-owned resource
+reset.
+
 A running session cannot be silently closed by starting another one. The
 parent saves a factual summary through the continuity API to end it. Parent
 fact and summary corrections are stored in campaign-scoped append-only
@@ -76,6 +83,13 @@ Parent writes and live redirects require the API-configured
 `Storykeeper__ParentPin`, sent in the request header and never persisted by the
 browser. A session pause is saved server-side and blocks both narration and
 check resolution.
+
+The campaign's parent safety settings also store an opt-in voice flag, false
+by default. The PWA uses the browser's secure-context speech-recognition and
+speech-synthesis APIs; audio is not sent to Storykeeper's API, and no provider
+credential or speech-service key is provided to the browser. Browser support,
+permission, and any browser-vendor speech processing remain outside the server
+boundary. Voice can be disabled by a parent through the PIN-gated settings.
 
 ## Storage configuration
 
