@@ -13,6 +13,12 @@ default connection string is `Data Source=storykeeper.db`; the database file
 is ignored by Git. Override it with `ConnectionStrings__Storykeeper`, for
 example `Data Source=C:\data\storykeeper.db` on Windows or
 `Data Source=/data/storykeeper.db` on Linux.
+The `ActiveSessionStoryTurnHistory` migration adds optional action, acting
+hero, dialogue, and check-reference columns plus a per-session sequence to
+`StoryBeats`. It preserves existing campaign/session rows and backfills legacy
+beat order from creation timestamps (marking that order estimated); deploy
+the updated API and allow the normal startup migration to run against the
+existing database. Do not recreate the database to install this schema.
 
 The web app's campaign library uses the API to create, list, load, complete,
 archive, and delete story worlds. The selected campaign ID is stored in the
@@ -38,6 +44,15 @@ JSON shape server-side, which supports compatible servers that reject the
 `json_object` response format. LM Studio may accept a placeholder API key such
 as `local-dev` when authentication is disabled; the API still requires a
 non-empty key setting.
+
+Active-session narrative history is configurable on the API server with
+`Storykeeper__Ai__RecentTurnLimit` (default `8`, valid range 1-50) and
+`Storykeeper__Ai__RecentTurnCharacterBudget` (default `12000`, valid range
+200-50000). These limit accepted recent turns and their aggregate text
+characters; character counts are not model-token limits. Docker Compose maps
+the same settings from `STORYKEEPER_AI_RECENT_TURN_LIMIT` and
+`STORYKEEPER_AI_RECENT_TURN_CHARACTER_BUDGET` in `.env`. Defaults work without
+setting either variable.
 
 ## Optional narrated playback
 
@@ -100,25 +115,26 @@ dotnet ef migrations add <MigrationName> --project src/Storykeeper.Api/Storykeep
 Commit generated migration files with the model change. Do not commit local
 SQLite databases.
 
-## Creating a Perplexity context archive
+## Creating a Perplexity context folder
 
-`Storykeeper.Archiver` creates a ZIP containing the solution files, source,
-tests, documentation, and configuration needed to understand the codebase.
-Run it from the repository root to create `Storykeeper-Perplexity.zip` beside
-the repository:
+`Storykeeper.Archiver` copies the solution files, source, tests, documentation,
+and configuration into a dated folder, preserving the repository's directory
+structure. Run it from any directory inside the repository:
 
 ```sh
 dotnet run --project src/Storykeeper.Archiver/Storykeeper.Archiver.csproj
 ```
 
-You can pass a source directory and an output ZIP path:
+By default, archives are created under
+`%USERPROFILE%\Documents\codearchives\StoryKeeper` on Windows, with a
+`yyyyMMdd-HHmm` folder name (for example, `20261010-0750`). You can provide
+both a source directory and a different archive root:
 
 ```sh
-dotnet run --project src/Storykeeper.Archiver/Storykeeper.Archiver.csproj -- "C:\path\to\source" "C:\path\to\output.zip"
+dotnet run --project src/Storykeeper.Archiver/Storykeeper.Archiver.csproj -- "C:\path\to\source" "C:\path\to\archive-root"
 ```
 
 The archive preserves relative paths and skips Git and IDE metadata,
 dependencies, `bin`, `obj`, frontend build output, DLLs, other compiled
 binaries, local databases, and local environment files. `.env.example` is
-included. Output defaults to a ZIP beside the source directory; the output
-file itself is never added if an explicit output path is inside the source.
+included. Existing dated folders are not overwritten.

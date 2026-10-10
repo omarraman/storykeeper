@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Storykeeper.Api.Contracts;
 using Storykeeper.Api.Data;
 using Storykeeper.Api.Domain;
@@ -142,7 +143,10 @@ public sealed class CampaignContinuityTests
         });
         await database.Context.SaveChangesAsync();
         var generator = new TestGenerator();
-        var service = new StoryTurnService(database.Context, generator);
+        var service = new StoryTurnService(
+            database.Context,
+            generator,
+            Options.Create(new StorykeeperAiOptions()));
 
         await service.SubmitActionAsync(campaign.Id, new StoryTurnRequest(
             "Ask Mira about the map room.", session.Id, hero.Id));

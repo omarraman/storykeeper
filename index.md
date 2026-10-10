@@ -34,8 +34,9 @@ Current implementation focus:
 - Reusable campaign/domain model with SQLite persistence and campaign isolation.
 - Server-authoritative, child-friendly d20 checks with session hearts, sparkle
   tokens, and forward-progress outcomes.
-- Campaign-scoped continuity with parent-curated session summaries, reviewable
-  facts, relevance-selected prompt context, and an edit audit trail.
+- Campaign-scoped continuity with parent-curated session summaries, bounded
+  accepted active-session history, reviewable facts, relevance-selected
+  prompt context, and an edit audit trail.
 - Chronological campaign storybooks with discoveries, hero milestones, rewards,
   and validated JSON backup/restore.
 - PIN-gated parent safety settings and live story redirects, enforced by the
@@ -56,8 +57,8 @@ Current implementation focus:
 
 | Document | Purpose | Status |
 |---|---|---|
-| [README.md](README.md) | Repository overview, local quick start, and source archive creation | Available |
-| [Development guide](docs/development.md) | Setup, run, test, configuration, deployment, and Perplexity source archives | Available |
+| [README.md](README.md) | Repository overview, local quick start, and source archive-folder creation | Available |
+| [Development guide](docs/development.md) | Setup, run, test, configuration, deployment, and Perplexity archive folders | Available |
 | [PWA installation and delivery](docs/pwa-delivery.md) | Android installation, app-shell caching, and production HTTPS delivery | Available |
 | [Architecture](docs/architecture.md) | Web PWA, API, persistence, and AI integration boundaries | Available |
 | [Domain model](docs/domain-model.md) | Campaigns, heroes, NPCs, facts, quests, sessions, and inventory | Available |

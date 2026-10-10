@@ -227,7 +227,10 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
         {
             entity.HasKey(beat => beat.Id);
             entity.Property(beat => beat.Narration).HasMaxLength(1200).IsRequired();
+            entity.Property(beat => beat.Action).HasMaxLength(500);
+            entity.Property(beat => beat.NpcDialogueJson).HasMaxLength(2000);
             entity.HasIndex(beat => new { beat.CampaignId, beat.SessionId, beat.Id }).IsUnique();
+            entity.HasIndex(beat => new { beat.CampaignId, beat.SessionId, beat.SequenceNumber }).IsUnique();
             entity.HasOne<Session>()
                 .WithMany()
                 .HasForeignKey(beat => new { beat.CampaignId, beat.SessionId })

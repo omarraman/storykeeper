@@ -11,6 +11,8 @@ services:
       Storykeeper__Ai__Model: ${STORYKEEPER_AI_MODEL:-}
       Storykeeper__Ai__ApiKey: ${STORYKEEPER_AI_API_KEY:-}
       Storykeeper__Ai__TimeoutSeconds: ${STORYKEEPER_AI_TIMEOUT_SECONDS:-60}
+      Storykeeper__Ai__RecentTurnLimit: ${STORYKEEPER_AI_RECENT_TURN_LIMIT:-8}
+      Storykeeper__Ai__RecentTurnCharacterBudget: ${STORYKEEPER_AI_RECENT_TURN_CHARACTER_BUDGET:-12000}
       Storykeeper__ParentPin: ${STORYKEEPER_PARENT_PIN:-}
       TextToSpeech__Enabled: ${TEXT_TO_SPEECH_ENABLED:-false}
       TextToSpeech__Provider: ${TEXT_TO_SPEECH_PROVIDER:-Disabled}

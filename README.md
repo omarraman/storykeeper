@@ -94,19 +94,20 @@ curl --fail http://localhost:5080/api/health
 The response should be `{"status":"Healthy"}`. The Vite development server
 serves the web app and proxies its health request to the API.
 
-## Create a source archive
+## Create a source archive folder
 
-Create a ZIP of the meaningful solution files for sharing with tools such as
-Perplexity:
+Copy the meaningful solution files into a dated folder for sharing with tools
+such as Perplexity:
 
 ```sh
 dotnet run --project src/Storykeeper.Archiver/Storykeeper.Archiver.csproj
 ```
 
-The archive is created beside the repository. Generated build output,
-dependencies, compiled binaries, local databases, and local environment files
-are omitted; `.env.example` and the source directory structure are included.
-See [Development](docs/development.md) for custom source and output paths.
+The folder is created under `Documents\codearchives\StoryKeeper` by default,
+named with a `yyyyMMdd-HHmm` timestamp. Generated build output, dependencies,
+compiled binaries, local databases, and local environment files are omitted;
+`.env.example` and the source directory structure are included. See
+[Development](docs/development.md) for custom source and output paths.
 
 ## Configuration and secrets
 

@@ -1,5 +1,3 @@
-using System.IO.Compression;
-
 namespace Storykeeper.Archiver;
 
 public static class SolutionArchiver
@@ -21,11 +19,11 @@ public static class SolutionArchiver
 
     public static async Task<int> CreateArchiveAsync(
         string sourceDirectory,
-        string outputPath,
+        string archiveDirectory,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceDirectory);
-        ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(archiveDirectory);
 
         var sourceFullPath = Path.GetFullPath(sourceDirectory);
         if (!Directory.Exists(sourceFullPath))
@@ -33,22 +31,14 @@ public static class SolutionArchiver
             throw new DirectoryNotFoundException($"Source directory does not exist: {sourceFullPath}");
         }
 
-        var outputFullPath = Path.GetFullPath(outputPath);
-        var entries = CollectEntries(sourceFullPath, outputFullPath);
-        var outputDirectory = Path.GetDirectoryName(outputFullPath);
-        if (outputDirectory is not null)
+        var archiveFullPath = Path.GetFullPath(archiveDirectory);
+        if (Directory.Exists(archiveFullPath) || File.Exists(archiveFullPath))
         {
-            Directory.CreateDirectory(outputDirectory);
+            throw new IOException($"Archive directory already exists: {archiveFullPath}");
         }
 
-        await using var outputStream = new FileStream(
-            outputFullPath,
-            FileMode.Create,
-            FileAccess.ReadWrite,
-            FileShare.None,
-            bufferSize: 81920,
-            useAsync: true);
-        using var archive = new ZipArchive(outputStream, ZipArchiveMode.Create, leaveOpen: true);
+        var entries = CollectEntries(sourceFullPath, archiveFullPath);
+        Directory.CreateDirectory(archiveFullPath);
 
         var fileCount = 0;
         foreach (var entry in entries)
@@ -56,11 +46,12 @@ public static class SolutionArchiver
             cancellationToken.ThrowIfCancellationRequested();
             if (entry.IsDirectory)
             {
-                archive.CreateEntry(entry.ArchivePath);
+                Directory.CreateDirectory(Path.Combine(archiveFullPath, entry.RelativePath));
                 continue;
             }
 
-            var archiveEntry = archive.CreateEntry(entry.ArchivePath, CompressionLevel.Optimal);
+            var destinationPath = Path.Combine(archiveFullPath, entry.RelativePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
             await using var sourceStream = new FileStream(
                 entry.FullPath,
                 FileMode.Open,
@@ -68,15 +59,21 @@ public static class SolutionArchiver
                 FileShare.Read,
                 bufferSize: 81920,
                 useAsync: true);
-            await using var entryStream = archiveEntry.Open();
-            await sourceStream.CopyToAsync(entryStream, cancellationToken);
+            await using var destinationStream = new FileStream(
+                destinationPath,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None,
+                bufferSize: 81920,
+                useAsync: true);
+            await sourceStream.CopyToAsync(destinationStream, cancellationToken);
             fileCount++;
         }
 
         return fileCount;
     }
 
-    private static List<ArchiveEntryInfo> CollectEntries(string sourceDirectory, string outputPath)
+    private static List<ArchiveEntryInfo> CollectEntries(string sourceDirectory, string archiveDirectory)
     {
         var entries = new List<ArchiveEntryInfo>();
         var directories = new Stack<string>();
@@ -89,15 +86,15 @@ public static class SolutionArchiver
             {
                 var directoryInfo = new DirectoryInfo(directory);
                 if (ExcludedDirectories.Contains(directoryInfo.Name)
-                    || IsReparsePoint(directoryInfo.Attributes))
+                    || IsReparsePoint(directoryInfo.Attributes)
+                    || IsSamePath(directory, archiveDirectory))
                 {
                     continue;
                 }
 
                 var relativePath = Path.GetRelativePath(sourceDirectory, directory)
-                    .Replace(Path.DirectorySeparatorChar, '/')
-                    .TrimEnd('/');
-                entries.Add(new ArchiveEntryInfo(directory, $"{relativePath}/", IsDirectory: true));
+                    .Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+                entries.Add(new ArchiveEntryInfo(directory, relativePath, IsDirectory: true));
                 directories.Push(directory);
             }
 
@@ -106,22 +103,25 @@ public static class SolutionArchiver
             {
                 var fileInfo = new FileInfo(file);
                 if (IsReparsePoint(fileInfo.Attributes)
-                    || string.Equals(Path.GetFullPath(file), outputPath, PathComparison)
+                    || IsSamePath(file, archiveDirectory)
                     || ShouldExcludeFile(fileInfo.Name))
                 {
                     continue;
                 }
 
                 var relativePath = Path.GetRelativePath(sourceDirectory, file)
-                    .Replace(Path.DirectorySeparatorChar, '/');
+                    .Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
                 entries.Add(new ArchiveEntryInfo(file, relativePath, IsDirectory: false));
             }
         }
 
         return entries
-            .OrderBy(entry => entry.ArchivePath, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(entry => entry.RelativePath, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
+
+    private static bool IsSamePath(string path, string otherPath) =>
+        string.Equals(Path.GetFullPath(path), otherPath, PathComparison);
 
     private static bool ShouldExcludeFile(string fileName)
     {
@@ -153,5 +153,5 @@ public static class SolutionArchiver
     private static bool IsReparsePoint(FileAttributes attributes) =>
         (attributes & FileAttributes.ReparsePoint) != 0;
 
-    private sealed record ArchiveEntryInfo(string FullPath, string ArchivePath, bool IsDirectory);
+    private sealed record ArchiveEntryInfo(string FullPath, string RelativePath, bool IsDirectory);
 }

@@ -1,5 +1,56 @@
 <Solution>
-  <Folder Name="/src/" />
+  <Folder Name="/src/">
+    <File Path="src/StoryKeeper.Archiver2/bin/Debug/net10.0/Scribbal.SourceArchiver.deps.json" />
+    <File Path="src/StoryKeeper.Archiver2/bin/Debug/net10.0/Scribbal.SourceArchiver.dll" />
+    <File Path="src/StoryKeeper.Archiver2/bin/Debug/net10.0/Scribbal.SourceArchiver.exe" />
+    <File Path="src/StoryKeeper.Archiver2/bin/Debug/net10.0/Scribbal.SourceArchiver.pdb" />
+    <File Path="src/StoryKeeper.Archiver2/bin/Debug/net10.0/Scribbal.SourceArchiver.runtimeconfig.json" />
+    <File Path="src/StoryKeeper.Archiver2/bin/Release/net10.0/Scribbal.SourceArchiver.deps.json" />
+    <File Path="src/StoryKeeper.Archiver2/bin/Release/net10.0/Scribbal.SourceArchiver.dll" />
+    <File Path="src/StoryKeeper.Archiver2/bin/Release/net10.0/Scribbal.SourceArchiver.exe" />
+    <File Path="src/StoryKeeper.Archiver2/bin/Release/net10.0/Scribbal.SourceArchiver.pdb" />
+    <File Path="src/StoryKeeper.Archiver2/bin/Release/net10.0/Scribbal.SourceArchiver.runtimeconfig.json" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Debug/net10.0/.NETCoreApp,Version=v10.0.AssemblyAttributes.cs" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Debug/net10.0/apphost.exe" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Debug/net10.0/ref/Scribbal.SourceArchiver.dll" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Debug/net10.0/refint/Scribbal.SourceArchiver.dll" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Debug/net10.0/Scribbal.SourceArchiver.AssemblyInfo.cs" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Debug/net10.0/Scribbal.SourceArchiver.AssemblyInfoInputs.cache" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Debug/net10.0/Scribbal.SourceArchiver.assets.cache" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Debug/net10.0/Scribbal.SourceArchiver.csproj.CoreCompileInputs.cache" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Debug/net10.0/Scribbal.SourceArchiver.csproj.FileListAbsolute.txt" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Debug/net10.0/Scribbal.SourceArchiver.dll" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Debug/net10.0/Scribbal.SourceArchiver.GeneratedMSBuildEditorConfig.editorconfig" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Debug/net10.0/Scribbal.SourceArchiver.genruntimeconfig.cache" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Debug/net10.0/Scribbal.SourceArchiver.GlobalUsings.g.cs" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Debug/net10.0/Scribbal.SourceArchiver.pdb" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Debug/net10.0/Scribbal.SourceArchiver.sourcelink.json" />
+    <File Path="src/StoryKeeper.Archiver2/obj/project.assets.json" />
+    <File Path="src/StoryKeeper.Archiver2/obj/project.nuget.cache" />
+    <File Path="src/StoryKeeper.Archiver2/obj/project.packagespec.json" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Release/net10.0/.NETCoreApp,Version=v10.0.AssemblyAttributes.cs" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Release/net10.0/apphost.exe" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Release/net10.0/ref/Scribbal.SourceArchiver.dll" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Release/net10.0/refint/Scribbal.SourceArchiver.dll" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Release/net10.0/Scribbal.SourceArchiver.AssemblyInfo.cs" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Release/net10.0/Scribbal.SourceArchiver.AssemblyInfoInputs.cache" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Release/net10.0/Scribbal.SourceArchiver.assets.cache" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Release/net10.0/Scribbal.SourceArchiver.csproj.CoreCompileInputs.cache" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Release/net10.0/Scribbal.SourceArchiver.csproj.FileListAbsolute.txt" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Release/net10.0/Scribbal.SourceArchiver.dll" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Release/net10.0/Scribbal.SourceArchiver.GeneratedMSBuildEditorConfig.editorconfig" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Release/net10.0/Scribbal.SourceArchiver.genruntimeconfig.cache" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Release/net10.0/Scribbal.SourceArchiver.GlobalUsings.g.cs" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Release/net10.0/Scribbal.SourceArchiver.pdb" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Release/net10.0/Scribbal.SourceArchiver.sourcelink.json" />
+    <File Path="src/StoryKeeper.Archiver2/obj/rider.project.model.nuget.info" />
+    <File Path="src/StoryKeeper.Archiver2/obj/rider.project.restore.info" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Scribbal.SourceArchiver.csproj.nuget.dgspec.json" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Scribbal.SourceArchiver.csproj.nuget.g.props" />
+    <File Path="src/StoryKeeper.Archiver2/obj/Scribbal.SourceArchiver.csproj.nuget.g.targets" />
+    <File Path="src/StoryKeeper.Archiver2/Program.cs" />
+    <File Path="src/StoryKeeper.Archiver2/Scribbal.SourceArchiver.csproj" />
+  </Folder>
   <Project Path="src/Storykeeper.Archiver/Storykeeper.Archiver.csproj" />
   <Folder Name="/tests/">
     <Project Path="tests/Storykeeper.Archiver.Tests/Storykeeper.Archiver.Tests.csproj" />

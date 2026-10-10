@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Storykeeper.Api.Contracts;
 using Storykeeper.Api.Data;
 using Storykeeper.Api.Domain;
@@ -8,7 +9,8 @@ namespace Storykeeper.Api.Services;
 
 public sealed class StoryTurnService(
     StorykeeperDbContext dbContext,
-    IStoryTurnGenerator generator) : IStoryTurnService
+    IStoryTurnGenerator generator,
+    IOptions<StorykeeperAiOptions> options) : IStoryTurnService
 {
     private static readonly JsonSerializerOptions ContextJsonOptions = AdventureDraftJson.Options;
 
@@ -66,6 +68,47 @@ public sealed class StoryTurnService(
                 throw new RuleValidationException("Choose a hero from this campaign.");
             }
         }
+
+        var (recentTurnLimit, recentTurnCharacterBudget) = GetRecentTurnLimits(options.Value);
+        var sequencedBeats = await dbContext.StoryBeats.AsNoTracking()
+            .Where(beat => beat.CampaignId == campaignId && beat.SessionId == session.Id)
+            .Where(beat => beat.SequenceNumber != null)
+            .OrderByDescending(beat => beat.SequenceNumber)
+            .Take(recentTurnLimit)
+            .ToArrayAsync(cancellationToken);
+        var unsequencedBeats = sequencedBeats.Length == recentTurnLimit
+            ? []
+            : await dbContext.StoryBeats.AsNoTracking()
+                .Where(beat => beat.CampaignId == campaignId &&
+                               beat.SessionId == session.Id &&
+                               beat.SequenceNumber == null)
+                .ToArrayAsync(cancellationToken);
+        var chronologicalLegacyBeats = unsequencedBeats
+            .OrderByDescending(beat => beat.CreatedAtUtc)
+            .ThenByDescending(beat => beat.Id)
+            .Take(recentTurnLimit - sequencedBeats.Length);
+        var chronologicalBeats = chronologicalLegacyBeats
+            .OrderBy(beat => beat.CreatedAtUtc)
+            .ThenBy(beat => beat.Id)
+            .Concat(sequencedBeats.OrderBy(beat => beat.SequenceNumber))
+            .ToArray();
+        var recentCheckIds = chronologicalBeats
+            .Where(beat => beat.CheckResolutionId is not null)
+            .Select(beat => beat.CheckResolutionId!.Value)
+            .Distinct()
+            .ToArray();
+        var recentChecks = recentCheckIds.Length == 0
+            ? new Dictionary<Guid, CheckResolution>()
+            : await dbContext.CheckResolutions.AsNoTracking()
+                .Where(check => check.CampaignId == campaignId &&
+                                check.SessionId == session.Id &&
+                                recentCheckIds.Contains(check.Id))
+                .ToDictionaryAsync(check => check.Id, cancellationToken);
+        var recentTurns = RecentStoryTurnContextBuilder.Build(
+            chronologicalBeats,
+            heroes.ToDictionary(hero => hero.Id),
+            recentChecks,
+            recentTurnCharacterBudget);
 
         var quests = await dbContext.Quests.AsNoTracking()
             .Where(item => item.CampaignId == campaignId)
@@ -126,7 +169,6 @@ public sealed class StoryTurnService(
             .Take(20)
             .ToArrayAsync(cancellationToken);
 
-        var contextHeroes = selectedHero is null ? heroes : [selectedHero];
         var context = new
         {
             campaign = new
@@ -146,8 +188,15 @@ public sealed class StoryTurnService(
                 summary = Limit(session.Summary, 1200),
                 parentInstruction = session.ParentInstruction
             },
-            party = contextHeroes.Select(hero => new
+            actingHero = selectedHero is null ? null : new
             {
+                selectedHero.Id,
+                selectedHero.Name,
+                selectedHero.Role
+            },
+            party = heroes.Select(hero => new
+            {
+                hero.Id,
                 hero.Name,
                 hero.Role,
                 description = Limit(hero.Description, 600),
@@ -159,6 +208,7 @@ public sealed class StoryTurnService(
                     item.Quantity
                 })
             }),
+            recentTurns,
             currentQuest = currentQuest is null ? null : new
             {
                 currentQuest.Title,
@@ -281,23 +331,49 @@ public sealed class StoryTurnService(
         }
 
         var storyBeatId = Guid.NewGuid();
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var lastSequence = await dbContext.StoryBeats.AsNoTracking()
+            .Where(beat => beat.CampaignId == campaignId && beat.SessionId == session.Id)
+            .MaxAsync(beat => beat.SequenceNumber, cancellationToken);
         dbContext.StoryBeats.Add(new StoryBeat
         {
-                Id = storyBeatId,
-                CampaignId = campaignId,
-                SessionId = session.Id,
-                Narration = content.Narration!
+            Id = storyBeatId,
+            CampaignId = campaignId,
+            SessionId = session.Id,
+            SequenceNumber = (lastSequence ?? 0) + 1,
+            Action = request.Action!.Trim(),
+            ActingHeroId = selectedHero?.Id,
+            Narration = content.Narration!,
+            NpcDialogueJson = JsonSerializer.Serialize(content.NpcDialogue, ContextJsonOptions),
+            CheckResolutionId = request.CheckResolutionId
         });
         if (session.ParentInstruction is not null)
         {
-                await dbContext.Sessions
+            await dbContext.Sessions
                 .Where(item => item.CampaignId == campaignId && item.Id == session.Id)
                 .ExecuteUpdateAsync(update => update.SetProperty(item => item.ParentInstruction, (string?)null),
                     cancellationToken);
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return StoryTurnResponse.ForStory(storyBeatId, content, facts, currentQuest, heroes);
+    }
+
+    private static (int TurnLimit, int CharacterBudget) GetRecentTurnLimits(StorykeeperAiOptions value)
+    {
+        if (value.RecentTurnLimit is < 1 or > 50)
+        {
+            throw new InvalidOperationException("Storykeeper:Ai:RecentTurnLimit must be between 1 and 50.");
+        }
+
+        if (value.RecentTurnCharacterBudget is < 200 or > 50_000)
+        {
+            throw new InvalidOperationException(
+                "Storykeeper:Ai:RecentTurnCharacterBudget must be between 200 and 50000.");
+        }
+
+        return (value.RecentTurnLimit, value.RecentTurnCharacterBudget);
     }
 
     private async Task<object?> LoadResolvedCheckAsync(

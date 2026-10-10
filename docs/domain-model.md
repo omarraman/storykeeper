@@ -46,6 +46,12 @@ campaign's party, hero, location, or session.
   hero, the difficulty and bonuses, the outcome band, the forward-progress
   requirement, and before/after heart and sparkle-token counts. Composite
   foreign keys keep both the hero and session within the owning campaign.
+- `StoryBeat` stores validated narration with backward-compatible optional
+  submitted action, acting hero ID, NPC dialogue JSON, and check-resolution ID.
+  A per-session sequence gives accepted turns deterministic chronology. Legacy
+  beats are assigned a best-effort sequence from `CreatedAtUtc` with an ID
+  tie-break and marked as estimated; exact ordering cannot be recovered when
+  legacy timestamps tie.
 - `CampaignFact` stores a durable statement, category, status (`Proposed`,
   `Active`, `Resolved`, `Superseded`, or `Discarded`), importance from 1 to 5,
   and an optional source session from the same campaign. Only active facts
@@ -77,6 +83,15 @@ recap, while a campaign fact is an individually categorized claim that can be
 activated, resolved, superseded, or discarded and traced to its source
 session. Continuity revisions are removed only when their campaign is
 permanently deleted.
+
+Live turn context keeps three memory types distinct: active facts are
+parent-reviewed durable canon, recent accepted StoryBeats are bounded
+campaign-and-session-scoped events, and a reviewed adventure plan is private
+facilitator material rather than evidence of player discovery or completion.
+Recent-turn context defaults to 8 beats and 12,000 aggregate text characters,
+with server-configured hard bounds of 1-50 beats and 200-50,000 characters.
+This character budget is not a token limit. Recent history improves narrative
+continuity but does not replace explicit adventure state or reviewed facts.
 
 Campaign archival preserves all campaign data. Archived campaigns remain
 loadable for save/resume history but cannot be updated through the campaign

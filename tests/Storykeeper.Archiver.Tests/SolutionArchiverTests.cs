@@ -1,4 +1,3 @@
-using System.IO.Compression;
 using Storykeeper.Archiver;
 using Xunit;
 
@@ -9,13 +8,14 @@ public sealed class SolutionArchiverTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
 
     [Fact]
-    public async Task CreateArchiveAsync_IncludesSourceAndDocumentationButSkipsGeneratedAndSecretFiles()
+    public async Task CreateArchiveAsync_CopiesSourceAndDocumentationButSkipsGeneratedAndSecretFiles()
     {
         Directory.CreateDirectory(_root);
         WriteFile("Storykeeper.slnx");
         WriteFile("src/Storykeeper.Api/Storykeeper.Api.csproj");
         WriteFile("src/Storykeeper.Api/Program.cs");
         WriteFile("docs/architecture.md");
+        Directory.CreateDirectory(Path.Combine(_root, "docs", "empty-topic"));
         WriteFile(".github/workflows/build.yml");
         WriteFile(".env.example");
         WriteFile("src/Storykeeper.Api/bin/Debug/net10.0/Storykeeper.Api.dll");
@@ -25,12 +25,14 @@ public sealed class SolutionArchiverTests : IDisposable
         WriteFile(".env");
         WriteFile("storykeeper.db");
         WriteFile("appsettings.Development.local.json");
-        var archivePath = Path.Combine(_root, "output", "context.zip");
+        var archivePath = Path.Combine(_root, "output", "20261010-0750");
 
         var count = await SolutionArchiver.CreateArchiveAsync(_root, archivePath);
 
-        using var archive = ZipFile.OpenRead(archivePath);
-        var entryNames = archive.Entries.Select(entry => entry.FullName).ToHashSet();
+        var entryNames = Directory.GetFiles(archivePath, "*", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(archivePath, path)
+                .Replace(Path.DirectorySeparatorChar, '/'))
+            .ToHashSet();
         Assert.Equal(6, count);
         Assert.Contains("Storykeeper.slnx", entryNames);
         Assert.Contains("src/Storykeeper.Api/Storykeeper.Api.csproj", entryNames);
@@ -38,7 +40,7 @@ public sealed class SolutionArchiverTests : IDisposable
         Assert.Contains("docs/architecture.md", entryNames);
         Assert.Contains(".github/workflows/build.yml", entryNames);
         Assert.Contains(".env.example", entryNames);
-        Assert.Contains("src/", entryNames);
+        Assert.True(Directory.Exists(Path.Combine(archivePath, "docs", "empty-topic")));
         Assert.DoesNotContain(entryNames, name =>
             name.Contains("/bin/", StringComparison.OrdinalIgnoreCase)
             || name.Contains("/obj/", StringComparison.OrdinalIgnoreCase)
@@ -51,16 +53,31 @@ public sealed class SolutionArchiverTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateArchiveAsync_DoesNotIncludeItsOutputWhenInsideSource()
+    public async Task CreateArchiveAsync_DoesNotIncludeItsDestinationWhenInsideSource()
     {
         Directory.CreateDirectory(_root);
         WriteFile("README.md");
-        var archivePath = Path.Combine(_root, "context.zip");
+        WriteFile("source/README.md");
+        var sourcePath = Path.Combine(_root, "source");
+        var archivePath = Path.Combine(sourcePath, "archives", "dated-copy");
 
-        await SolutionArchiver.CreateArchiveAsync(_root, archivePath);
+        var count = await SolutionArchiver.CreateArchiveAsync(sourcePath, archivePath);
 
-        using var archive = ZipFile.OpenRead(archivePath);
-        Assert.DoesNotContain(archive.Entries, entry => entry.FullName == "context.zip");
+        Assert.Equal(1, count);
+        Assert.True(File.Exists(Path.Combine(archivePath, "README.md")));
+        Assert.False(Directory.Exists(Path.Combine(archivePath, "archives")));
+    }
+
+    [Fact]
+    public async Task CreateArchiveAsync_RejectsExistingDestination()
+    {
+        Directory.CreateDirectory(_root);
+        WriteFile("README.md");
+        var archivePath = Path.Combine(_root, "existing");
+        Directory.CreateDirectory(archivePath);
+
+        await Assert.ThrowsAsync<IOException>(() =>
+            SolutionArchiver.CreateArchiveAsync(_root, archivePath));
     }
 
     public void Dispose()
