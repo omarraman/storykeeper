@@ -1,0 +1,55 @@
+.hero-party-toggle {
+  margin-top: 18px;
+}
+
+.hero-create-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #e9e3d7;
+}
+
+.hero-create-form label {
+  display: grid;
+  gap: 5px;
+  color: #52675a;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.hero-create-form label span {
+  color: #778279;
+  font-size: 0.78rem;
+  font-weight: 400;
+}
+
+.hero-create-form input,
+.hero-create-form textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #d7d5c9;
+  border-radius: 9px;
+  color: #344f41;
+  background: #fffefa;
+  font: inherit;
+  font-weight: 400;
+}
+
+.hero-create-form textarea {
+  resize: vertical;
+}
+
+.hero-create-form input:focus-visible,
+.hero-create-form textarea:focus-visible {
+  outline: 3px solid #a8c4ad;
+  outline-offset: 2px;
+}
+
+.hero-party-hint {
+  margin: 10px 0 0;
+  color: #68766b;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
