@@ -6,6 +6,30 @@ namespace Storykeeper.Api.Services;
 
 public sealed class CampaignBriefService(StorykeeperDbContext dbContext) : ICampaignBriefService
 {
+    public async Task<CampaignBrief?> UpdateNarratorGuideAsync(
+        Guid briefId,
+        string? narratorGuide,
+        CancellationToken cancellationToken = default)
+    {
+        if (narratorGuide?.Length > NarratorGuideLimits.MaximumCharacters)
+        {
+            throw new ArgumentOutOfRangeException(nameof(narratorGuide),
+                $"The full narrator guide cannot exceed {NarratorGuideLimits.MaximumCharacters} characters.");
+        }
+
+        var brief = await dbContext.CampaignBriefs
+            .SingleOrDefaultAsync(item => item.Id == briefId, cancellationToken);
+        if (brief is null)
+        {
+            return null;
+        }
+
+        brief.NarratorGuide = string.IsNullOrWhiteSpace(narratorGuide) ? null : narratorGuide;
+        brief.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return brief;
+    }
+
     public async Task<CampaignBrief> CreateAsync(CampaignBrief brief, CancellationToken cancellationToken = default)
     {
         var now = DateTimeOffset.UtcNow;
@@ -49,6 +73,10 @@ public sealed class CampaignBriefService(StorykeeperDbContext dbContext) : ICamp
         existing.Inclusions = brief.Inclusions;
         existing.Exclusions = brief.Exclusions;
         existing.StoryIdea = brief.StoryIdea;
+        if (brief.NarratorGuide is not null)
+        {
+            existing.NarratorGuide = brief.NarratorGuide;
+        }
         existing.SafetySettings = brief.SafetySettings;
         existing.SafetyBoundaries = CampaignBriefDefaults.SafetyBoundaries.ToList();
         existing.UpdatedAtUtc = DateTimeOffset.UtcNow;

@@ -65,6 +65,16 @@ factual summary and the parent PIN.
 The PIN is a household access gate, not a user account or identity system.
 Third-party parental-control integration is not provided.
 
+Full narrator guides are private from player-facing campaign, turn, storybook,
+and ordinary export responses. Guide reads, edits, approval, and removal use
+the same PIN gate and rate limit as other parent operations. A pending
+revision never affects narration, and guide changes/removal are rejected while
+a session is running; the API never ends sessions automatically. Explicit
+parent-authorised backups do not yet include guides. Private does not mean
+hidden from the configured AI provider: hosted providers receive the guide
+during scaffolding generation and on each story turn. Parents should review
+provider handling before including sensitive family information.
+
 The API verifies with `POST /api/parent-controls/verify`; saves campaign
 settings with `PUT /api/campaigns/{campaignId}/parent-controls`; and applies
 live actions with `POST

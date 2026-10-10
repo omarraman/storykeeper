@@ -26,6 +26,7 @@ public sealed class OpenAiCompatibleCampaignDraftGenerator(
         Create a cozy, low-fright, age-appropriate campaign with player agency, gentle problems, and hopeful ways forward.
         Never use gore, cruelty, mature themes, permanent character death, or mandatory tactical combat.
         Honor the parent safety settings and avoid every excluded topic and creature in all generated text.
+        If supplied, authoredGuide is private source material for compatible campaign scaffolding. Preserve its core truths and distinguish hidden resolutions from player-facing descriptions. Do not put hidden resolutions into player-facing premises, NPC descriptions, or location descriptions. The source remains verbatim outside your generated JSON; do not claim perfect fidelity.
         Combat must remain optional, non-graphic, and never tactical; use the requested mode only within that boundary.
         Avoid frightening or graphic content. Failures must create progress with a complication, clue, gentle setback, or another route.
         Return only a JSON object matching this shape:
@@ -81,6 +82,7 @@ public sealed class OpenAiCompatibleCampaignDraftGenerator(
                         brief.Inclusions,
                         brief.Exclusions,
                         brief.StoryIdea,
+                        authoredGuide = brief.NarratorGuide,
                         brief.SafetyBoundaries,
                         brief.SafetySettings
                     }, ProviderJsonOptions)

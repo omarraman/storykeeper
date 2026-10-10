@@ -69,7 +69,14 @@ campaign's party, hero, location, or session.
   independently of campaigns and have creation/update timestamps.
 - `CampaignDraft` stores a validated, structured generated draft linked to
   its brief. It tracks generation number, pending-review/approved/activated
-  status, and the activated campaign when present.
+  status, separate optional verbatim `NarratorGuide` source, approval time,
+  and the activated campaign when present. Regeneration changes structured
+  content but never replaces that authored source.
+- `CampaignNarratorGuide` stores the single optional guide for an active
+  campaign. It holds the active approved text/revision separately from pending
+  text/revision, with approval and pending-update timestamps. Pending text is
+  never used for play. Session-running restrictions are checked server-side;
+  guide removal is an explicit parent action.
 - `CampaignBibleVersion` stores a campaign-scoped immutable snapshot of each
   activated bible, including its source draft and version number.
 - `Reward` stores a campaign reward and may associate it with a hero from the
@@ -88,6 +95,8 @@ Live turn context keeps three memory types distinct: active facts are
 parent-reviewed durable canon, recent accepted StoryBeats are bounded
 campaign-and-session-scoped events, and a reviewed adventure plan is private
 facilitator material rather than evidence of player discovery or completion.
+The complete approved campaign narrator guide is also private facilitator
+material and is loaded only from that campaign's active guide revision.
 Recent-turn context defaults to 8 beats and 12,000 aggregate text characters,
 with server-configured hard bounds of 1-50 beats and 200-50,000 characters.
 This character budget is not a token limit. Recent history improves narrative

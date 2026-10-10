@@ -1462,6 +1462,14 @@ select:focus-visible {
   gap: clamp(28px, 6vw, 76px);
 }
 
+.narrator-guide-wizard {
+  grid-column: 1 / -1;
+  padding: 20px;
+  border: 1px solid #e9e3d7;
+  border-radius: 16px;
+  background: #fffdf8;
+}
+
 .wizard-copy h2,
 .saved-briefs-heading h2 {
   margin: 12px 0;

@@ -2,13 +2,50 @@
 
 ## Campaign brief wizard
 
-The parent-led wizard collects a title, genre, tone, optional story idea,
+The parent-led wizard collects a title, genre, tone, optional short story idea,
 campaign length in sessions, session length in minutes, and optional
 inclusions and exclusions. It saves a `CampaignBrief` draft independently of
 campaigns; saving a brief does not create a playable campaign or start AI
 generation. Saved briefs can be reopened and edited from the campaign library,
 or discarded there. Leaving the editor without saving discards the in-progress
 changes.
+
+The optional **Full narrator guide (private)** is a separate, verbatim authored
+source for self-contained adventures. It is not the Story spark, generated
+campaign content, or an adventure plan. Parents can paste or import UTF-8
+`.md`/`.txt` text, up to 30,000 characters and 120,000 upload bytes. HTML,
+PDF, DOCX, archives, and other file types are not parsed. The API limits
+request bodies to 480,000 bytes and rejects over-limit guide text; it never
+clips text or calls AI to rewrite, summarize, or import it. Formatting and
+newlines are preserved. Blank guide text keeps the regular short-idea workflow.
+The Story spark remains a separate optional premise seed capped at 2,000
+characters.
+
+Guides are stored separately on the saved brief and campaign draft, independent
+of generated `ContentJson`. They are passed as distinct `authoredGuide` input
+to campaign scaffolding generation; the source remains unchanged if generation
+is rerun. Generated premise, mystery, locations, NPCs, and hooks are
+scaffolding for parent review, not a fidelity guarantee. Parents can correct
+the generated draft and must review/approve the guide together with the
+scaffolding before activation. Editing the guide invalidates draft approval.
+Activation copies the approved guide verbatim into the campaign.
+
+There is one active narrator guide per campaign in this version. Existing
+campaign guides have a pending text, revision number, and approval timestamp;
+only an explicitly approved revision becomes active. Pending text does not
+reach narration. Changes and removal are blocked while a session is running;
+parents must end it through the ordinary session flow. Removal requires a
+separate parent-confirmed action. All guide read/write and approval routes
+require the parent PIN. Existing campaigns and drafts without guides remain
+unchanged.
+
+The guide is private from players, not from the configured AI provider. A
+hosted provider receives the full approved text on every story turn and can
+receive the source during initial or regenerated campaign scaffolding
+generation. Resending a long guide increases token usage; character length is
+not a fixed token count. See [AI Storykeeper](ai-storykeeper.md) for turn
+context rules and [Safety and parent controls](safety-and-parent-controls.md)
+for the privacy boundary.
 
 The API owns brief persistence. `GET /api/campaign-briefs` lists saved drafts,
 `POST /api/campaign-briefs` creates one, `GET

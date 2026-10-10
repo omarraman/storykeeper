@@ -7,6 +7,9 @@ import { ParentControlsPanel, type ParentSafetySettings } from './adventure/Pare
 import { CampaignStorybookPanel } from './storybook/CampaignStorybookPanel'
 import { adventureTurnClient } from './adventure/client'
 import { HeroPartyPanel } from './campaign/HeroPartyPanel'
+import { NarratorGuidePanel } from './campaign/NarratorGuidePanel'
+import { DraftNarratorGuidePanel } from './campaign/DraftNarratorGuidePanel'
+import { NarratorGuideTextEditor } from './campaign/NarratorGuideTextEditor'
 import { PwaInstallControl } from './PwaInstallControl'
 import type { AdventureCampaign, SessionStartResponse } from './adventure/contracts'
 import './App.css'
@@ -23,6 +26,7 @@ type CampaignBriefInput = {
   inclusions: string[]
   exclusions: string[]
   storyIdea: string | null
+  narratorGuide?: string
   safetySettings: ParentSafetySettings
 }
 type CampaignBrief = CampaignBriefInput & {
@@ -79,6 +83,7 @@ function newBrief(): CampaignBriefInput {
     inclusions: [],
     exclusions: [],
     storyIdea: '',
+    narratorGuide: '',
     safetySettings: {
       fearLevel: 'low',
       combatMode: 'avoid',
@@ -166,6 +171,8 @@ function App() {
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null)
   const [playingAdventure, setPlayingAdventure] = useState(false)
   const [selectedDraft, setSelectedDraft] = useState<CampaignDraft | null>(null)
+  const [draftGuideDirty, setDraftGuideDirty] = useState(false)
+  const [activeGuideDirty, setActiveGuideDirty] = useState(false)
   const [draftForm, setDraftForm] = useState<CampaignDraftContent | null>(null)
   const [editingDraft, setEditingDraft] = useState(false)
   const [activeTab, setActiveTab] = useState<CampaignTab>('Active')
@@ -174,6 +181,7 @@ function App() {
   const [showWizard, setShowWizard] = useState(false)
   const [editingBriefId, setEditingBriefId] = useState<string | null>(null)
   const [briefForm, setBriefForm] = useState<CampaignBriefInput>(newBrief)
+  const [initialBriefSnapshot, setInitialBriefSnapshot] = useState('')
   const [parentPin, setParentPin] = useState('')
   const [wizardStep, setWizardStep] = useState(0)
   const [error, setError] = useState('')
@@ -184,6 +192,16 @@ function App() {
     () => campaigns.filter((campaign) => campaign.status === activeTab),
     [activeTab, campaigns],
   )
+
+  useEffect(() => {
+    if (!showWizard || JSON.stringify(briefForm) === initialBriefSnapshot) return
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warnBeforeLeaving)
+    return () => window.removeEventListener('beforeunload', warnBeforeLeaving)
+  }, [briefForm, initialBriefSnapshot, showWizard])
 
   useEffect(() => {
     let stopped = false
@@ -265,10 +283,26 @@ function App() {
     }
   }
 
-  const startBrief = (brief?: CampaignBrief) => {
+  const startBrief = async (brief?: CampaignBrief) => {
     setError('')
+    let narratorGuide = ''
+    if (brief) {
+      const pin = parentPin || window.prompt('Enter the parent PIN to load the private narrator guide.')
+      if (!pin) return
+      setParentPin(pin)
+      try {
+        const result = await request<{ text: string | null }>(
+          `/api/campaign-briefs/${encodeURIComponent(brief.id)}/narrator-guide`,
+          { headers: { 'X-Parent-Pin': pin } },
+        )
+        narratorGuide = result.text ?? ''
+      } catch (loadError) {
+        setError(loadError instanceof Error ? loadError.message : 'Could not load the private narrator guide.')
+        return
+      }
+    }
     setEditingBriefId(brief?.id ?? null)
-    setBriefForm(brief ? {
+    const form = brief ? {
       title: brief.title,
       genre: brief.genre,
       tone: brief.tone,
@@ -277,12 +311,15 @@ function App() {
       inclusions: [...brief.inclusions],
       exclusions: [...brief.exclusions],
       storyIdea: brief.storyIdea,
+      narratorGuide,
       safetySettings: {
         ...(brief.safetySettings ?? newBrief().safetySettings),
         excludedContent: [...(brief.safetySettings?.excludedContent ?? [])],
       },
-    } : newBrief())
-    setParentPin('')
+    } : newBrief()
+    setBriefForm(form)
+    setInitialBriefSnapshot(JSON.stringify(form))
+    if (!brief) setParentPin('')
     setWizardStep(0)
     setShowWizard(true)
   }
@@ -302,10 +339,16 @@ function App() {
   }
 
   const generateDraft = async (brief: CampaignBrief) => {
+    const pin = parentPin || window.prompt('Enter the parent PIN to send this brief and private guide to the configured AI provider.')
+    if (!pin) return
+    setParentPin(pin)
     setSaving(true)
     setError('')
     try {
-      const draft = await request<CampaignDraft>(`/api/campaign-briefs/${encodeURIComponent(brief.id)}/drafts`, { method: 'POST' })
+      const draft = await request<CampaignDraft>(`/api/campaign-briefs/${encodeURIComponent(brief.id)}/drafts`, {
+        method: 'POST',
+        headers: { 'X-Parent-Pin': pin },
+      })
       setDrafts((current) => [draft, ...current])
       openDraft(draft)
     } catch (generationError) {
@@ -317,10 +360,16 @@ function App() {
 
   const regenerateDraft = async () => {
     if (!selectedDraft || !window.confirm('Regenerate this draft? Its current generated text will be replaced.')) return
+    const pin = parentPin || window.prompt('Enter the parent PIN to regenerate this campaign draft.')
+    if (!pin) return
+    setParentPin(pin)
     setSaving(true)
     setError('')
     try {
-      const updated = await request<CampaignDraft>(`/api/campaign-drafts/${encodeURIComponent(selectedDraft.id)}/regenerate`, { method: 'POST' })
+      const updated = await request<CampaignDraft>(`/api/campaign-drafts/${encodeURIComponent(selectedDraft.id)}/regenerate`, {
+        method: 'POST',
+        headers: { 'X-Parent-Pin': pin },
+      })
       setSavedDraft(updated)
       setEditingDraft(false)
     } catch (generationError) {
@@ -351,10 +400,16 @@ function App() {
 
   const approveDraft = async () => {
     if (!selectedDraft) return
+    const pin = parentPin || window.prompt('Enter the parent PIN to approve this campaign and its private guide.')
+    if (!pin) return
+    setParentPin(pin)
     setSaving(true)
     setError('')
     try {
-      const approved = await request<CampaignDraft>(`/api/campaign-drafts/${encodeURIComponent(selectedDraft.id)}/approve`, { method: 'POST' })
+      const approved = await request<CampaignDraft>(`/api/campaign-drafts/${encodeURIComponent(selectedDraft.id)}/approve`, {
+        method: 'POST',
+        headers: { 'X-Parent-Pin': pin },
+      })
       setSavedDraft(approved)
     } catch (approvalError) {
       setError(approvalError instanceof Error ? approvalError.message : 'Could not approve this campaign draft.')
@@ -365,10 +420,16 @@ function App() {
 
   const activateDraft = async () => {
     if (!selectedDraft || !window.confirm(`Activate “${selectedDraft.content.title}” as a new, separate story world?`)) return
+    const pin = parentPin || window.prompt('Enter the parent PIN to activate this campaign and its private guide.')
+    if (!pin) return
+    setParentPin(pin)
     setSaving(true)
     setError('')
     try {
-      const campaign = await request<Campaign>(`/api/campaign-drafts/${encodeURIComponent(selectedDraft.id)}/activate`, { method: 'POST' })
+      const campaign = await request<Campaign>(`/api/campaign-drafts/${encodeURIComponent(selectedDraft.id)}/activate`, {
+        method: 'POST',
+        headers: { 'X-Parent-Pin': pin },
+      })
       const activated = {
         ...selectedDraft,
         campaignId: campaign.id,
@@ -390,10 +451,16 @@ function App() {
 
   const discardDraft = async (draft: CampaignDraft) => {
     if (!window.confirm(`Discard the campaign draft “${draft.content.title}”?`)) return
+    const pin = parentPin || window.prompt('Enter the parent PIN to discard this campaign draft and its guide.')
+    if (!pin) return
+    setParentPin(pin)
     setSaving(true)
     setError('')
     try {
-      await request<void>(`/api/campaign-drafts/${encodeURIComponent(draft.id)}`, { method: 'DELETE' })
+      await request<void>(`/api/campaign-drafts/${encodeURIComponent(draft.id)}`, {
+        method: 'DELETE',
+        headers: { 'X-Parent-Pin': pin },
+      })
       setDrafts((current) => current.filter((item) => item.id !== draft.id))
       if (selectedDraft?.id === draft.id) {
         setSelectedDraft(null)
@@ -408,9 +475,12 @@ function App() {
   }
 
   const leaveDraft = () => {
+    if ((editingDraft || draftGuideDirty) &&
+        !window.confirm('Leave this review and discard unsaved draft or guide changes?')) return
     setSelectedDraft(null)
     setDraftForm(null)
     setEditingDraft(false)
+    setDraftGuideDirty(false)
     setError('')
   }
 
@@ -468,9 +538,15 @@ function App() {
 
   const discardBrief = async (brief: CampaignBrief) => {
     if (!window.confirm(`Discard the saved brief “${brief.title}”? This cannot be undone.`)) return
+    const pin = parentPin || window.prompt('Enter the parent PIN to discard this brief and its private narrator guide.')
+    if (!pin) return
+    setParentPin(pin)
     setError('')
     try {
-      await request<void>(`/api/campaign-briefs/${encodeURIComponent(brief.id)}`, { method: 'DELETE' })
+      await request<void>(`/api/campaign-briefs/${encodeURIComponent(brief.id)}`, {
+        method: 'DELETE',
+        headers: { 'X-Parent-Pin': pin },
+      })
       setBriefs((current) => current.filter((item) => item.id !== brief.id))
       setDrafts((current) => current.filter((draft) => draft.campaignBriefId !== brief.id))
     } catch (discardError) {
@@ -491,6 +567,7 @@ function App() {
           body: JSON.stringify({
             ...briefForm,
             storyIdea: briefForm.storyIdea || null,
+            narratorGuide: editingBriefId ? undefined : briefForm.narratorGuide || null,
             safetySettings: {
               ...briefForm.safetySettings,
               excludedContent: briefForm.exclusions,
@@ -499,11 +576,17 @@ function App() {
           }),
         },
       )
+      if (editingBriefId) {
+        await request<void>(`/api/campaign-briefs/${encodeURIComponent(saved.id)}/narrator-guide`, {
+          method: 'PUT',
+          headers: { 'X-Parent-Pin': parentPin },
+          body: JSON.stringify({ text: briefForm.narratorGuide || null }),
+        })
+      }
       setBriefs((current) => [saved, ...current.filter((brief) => brief.id !== saved.id)])
       setShowWizard(false)
       setEditingBriefId(null)
       setWizardStep(0)
-      setParentPin('')
       setError('')
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Could not save this campaign brief.')
@@ -522,6 +605,8 @@ function App() {
   }
 
   const leaveWizard = () => {
+    if (JSON.stringify(briefForm) !== initialBriefSnapshot &&
+        !window.confirm('Discard unsaved campaign brief and narrator guide changes?')) return
     setShowWizard(false)
     setEditingBriefId(null)
     setWizardStep(0)
@@ -550,6 +635,8 @@ function App() {
 
   const startOrResumeAdventure = async () => {
     if (!selectedCampaign || selectedCampaign.status !== 'Active') return
+    if (activeGuideDirty && !window.confirm('Start the session and discard unsaved guide edits?')) return
+    if (activeGuideDirty) setActiveGuideDirty(false)
     setSaving(true)
     setError('')
     try {
@@ -607,6 +694,12 @@ function App() {
             : null,
         }
       : current)
+  }
+
+  const leaveCampaignRoom = () => {
+    if (activeGuideDirty && !window.confirm('Leave this story world and discard unsaved narrator guide edits?')) return
+    setActiveGuideDirty(false)
+    setSelectedCampaign(null)
   }
 
   const addCampaignHero = (hero: Hero) => {
@@ -718,7 +811,15 @@ function App() {
                   <label htmlFor="brief-idea">Your story spark <span>(optional)</span></label>
                   <textarea id="brief-idea" maxLength={2000} rows={3} value={briefForm.storyIdea ?? ''}
                     onChange={(event) => updateBrief('storyIdea', event.target.value)} placeholder="A tiny dragon is looking for a place to belong…" />
+                  <p className="field-hint">A short premise seed, up to 2,000 characters. For a complete authored adventure, use the separate private guide below.</p>
                 </div>
+                <section className="narrator-guide-wizard">
+                  <p className="card-kicker">OPTIONAL AUTHORED SOURCE</p>
+                  <NarratorGuideTextEditor
+                    value={briefForm.narratorGuide ?? ''}
+                    onChange={(narratorGuide) => updateBrief('narratorGuide', narratorGuide)}
+                  />
+                </section>
               </div>
             )}
             {wizardStep === 1 && (
@@ -847,6 +948,14 @@ function App() {
             )}
           </div>
           {error && <p className="alert" role="alert">{error}</p>}
+          <DraftNarratorGuidePanel
+            draft={selectedDraft}
+            onDirtyChange={setDraftGuideDirty}
+            onSaved={(status) => {
+              const updated = { ...selectedDraft, status, approvedAtUtc: null }
+              setSavedDraft(updated)
+            }}
+          />
           {editingDraft && draftForm ? (
             <form className="draft-edit-form" onSubmit={(event) => void saveDraftEdits(event)}>
               <div className="draft-edit-overview">
@@ -994,13 +1103,13 @@ function App() {
                 {selectedDraft.status === 'PendingReview' && (
                   <>
                     <span>Only activate a draft after reviewing its story details.</span>
-                    <button className="button button-primary" disabled={saving} onClick={() => void approveDraft()}>Approve draft</button>
+                    <button className="button button-primary" disabled={saving || draftGuideDirty} onClick={() => void approveDraft()}>Approve draft</button>
                   </>
                 )}
                 {selectedDraft.status === 'Approved' && (
                   <>
                     <span>Parent approved · ready to create an isolated story world.</span>
-                    <button className="button button-primary" disabled={saving} onClick={() => void activateDraft()}>Activate campaign</button>
+                    <button className="button button-primary" disabled={saving || draftGuideDirty} onClick={() => void activateDraft()}>Activate campaign</button>
                   </>
                 )}
                 {selectedDraft.status === 'Activated' && <span>This draft has been activated as a separate story world.</span>}
@@ -1019,7 +1128,7 @@ function App() {
         />
       ) : selectedCampaign ? (
         <section className="campaign-room" aria-labelledby="room-title">
-          <button className="text-button back-button" onClick={() => setSelectedCampaign(null)}>
+          <button className="text-button back-button" onClick={leaveCampaignRoom}>
             <span aria-hidden="true">←</span> All story worlds
           </button>
           <div className="room-heading">
@@ -1077,6 +1186,12 @@ function App() {
             campaignId={selectedCampaign.id}
             settings={selectedCampaign.safetySettings}
             onSettingsSaved={(safetySettings) => setSelectedCampaign({ ...selectedCampaign, safetySettings })}
+          />
+          <NarratorGuidePanel
+            key={`narrator-guide-${selectedCampaign.id}`}
+            campaignId={selectedCampaign.id}
+            activeSession={selectedCampaign.latestSession?.endedAtUtc === null}
+            onDirtyChange={setActiveGuideDirty}
           />
           <AdventureDraftPanel
             key={selectedCampaign.id}

@@ -27,6 +27,7 @@ public sealed class CampaignDraftService(
         {
             CampaignBriefId = brief.Id,
             ContentJson = Serialize(content),
+            NarratorGuide = brief.NarratorGuide,
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         };
@@ -44,6 +45,37 @@ public sealed class CampaignDraftService(
     public Task<CampaignDraft?> GetAsync(Guid draftId, CancellationToken cancellationToken = default) =>
         dbContext.CampaignDrafts.AsNoTracking()
             .SingleOrDefaultAsync(draft => draft.Id == draftId, cancellationToken);
+
+    public async Task<CampaignDraftOperationResult> UpdateNarratorGuideAsync(
+        Guid draftId,
+        string? narratorGuide,
+        CancellationToken cancellationToken = default)
+    {
+        var draft = await dbContext.CampaignDrafts
+            .SingleOrDefaultAsync(item => item.Id == draftId, cancellationToken);
+        if (draft is null)
+        {
+            return new CampaignDraftOperationResult(CampaignDraftOperationStatus.NotFound);
+        }
+
+        if (draft.Status == CampaignDraftStatus.Activated)
+        {
+            return new CampaignDraftOperationResult(CampaignDraftOperationStatus.AlreadyActivated, draft);
+        }
+
+        if (narratorGuide?.Length > NarratorGuideLimits.MaximumCharacters)
+        {
+            throw new ArgumentOutOfRangeException(nameof(narratorGuide),
+                $"The full narrator guide cannot exceed {NarratorGuideLimits.MaximumCharacters} characters.");
+        }
+
+        draft.NarratorGuide = string.IsNullOrWhiteSpace(narratorGuide) ? null : narratorGuide;
+        draft.Status = CampaignDraftStatus.PendingReview;
+        draft.ApprovedAtUtc = null;
+        draft.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return new CampaignDraftOperationResult(CampaignDraftOperationStatus.Succeeded, draft);
+    }
 
     public async Task<CampaignDraftOperationResult> RegenerateAsync(
         Guid draftId,
@@ -63,10 +95,12 @@ public sealed class CampaignDraftService(
 
         var brief = await dbContext.CampaignBriefs.AsNoTracking()
             .SingleAsync(item => item.Id == draft.CampaignBriefId, cancellationToken);
+        brief.NarratorGuide = draft.NarratorGuide;
         var content = await GenerateValidatedContentAsync(brief, cancellationToken);
         draft.ContentJson = Serialize(content);
         draft.GenerationNumber++;
         draft.Status = CampaignDraftStatus.PendingReview;
+        draft.ApprovedAtUtc = null;
         draft.UpdatedAtUtc = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
         return new CampaignDraftOperationResult(CampaignDraftOperationStatus.Succeeded, draft);
@@ -94,6 +128,7 @@ public sealed class CampaignDraftService(
         var normalized = ValidateAndNormalize(content, GetExcludedContent(brief));
         draft.ContentJson = Serialize(normalized);
         draft.Status = CampaignDraftStatus.PendingReview;
+        draft.ApprovedAtUtc = null;
         draft.UpdatedAtUtc = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
         return new CampaignDraftOperationResult(CampaignDraftOperationStatus.Succeeded, draft);
@@ -119,6 +154,7 @@ public sealed class CampaignDraftService(
             .SingleAsync(item => item.Id == draft.CampaignBriefId, cancellationToken);
         _ = ValidateAndNormalize(Deserialize(draft.ContentJson), GetExcludedContent(brief));
         draft.Status = CampaignDraftStatus.Approved;
+        draft.ApprovedAtUtc = DateTimeOffset.UtcNow;
         draft.UpdatedAtUtc = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);
         return new CampaignDraftOperationResult(CampaignDraftOperationStatus.Succeeded, draft);
@@ -172,6 +208,16 @@ public sealed class CampaignDraftService(
             },
             Party = new Party { Name = "Adventurers" }
         };
+        if (!string.IsNullOrWhiteSpace(draft.NarratorGuide))
+        {
+            campaign.NarratorGuides.Add(new CampaignNarratorGuide
+            {
+                CampaignId = campaign.Id,
+                ActiveText = draft.NarratorGuide,
+                ActiveRevision = 1,
+                ActiveApprovedAtUtc = draft.ApprovedAtUtc ?? now
+            });
+        }
         var locations = content.Locations!.Select(location => new Location
         {
             CampaignId = campaign.Id,

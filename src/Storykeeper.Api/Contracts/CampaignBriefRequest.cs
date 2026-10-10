@@ -11,7 +11,8 @@ public sealed record CampaignBriefRequest(
     IReadOnlyList<string>? Inclusions,
     IReadOnlyList<string>? Exclusions,
     string? StoryIdea,
-    ParentSafetySettings? SafetySettings = null)
+    ParentSafetySettings? SafetySettings = null,
+    string? NarratorGuide = null)
 {
     public CampaignBrief ToDomain() => new()
     {
@@ -23,6 +24,7 @@ public sealed record CampaignBriefRequest(
         Inclusions = Normalize(Inclusions),
         Exclusions = Normalize(Exclusions),
         StoryIdea = string.IsNullOrWhiteSpace(StoryIdea) ? null : StoryIdea.Trim(),
+        NarratorGuide = string.IsNullOrWhiteSpace(NarratorGuide) ? null : NarratorGuide,
         SafetySettings = (SafetySettings ?? ParentSafetySettings.Defaults) with
         {
             SessionLengthMinutes = SessionLengthMinutes,
@@ -80,6 +82,11 @@ public static class CampaignBriefRequestValidator
         if (request.StoryIdea?.Trim().Length > 2000)
         {
             errors["storyIdea"] = ["The story idea cannot exceed 2000 characters."];
+        }
+
+        if (request.NarratorGuide?.Length > NarratorGuideLimits.MaximumCharacters)
+        {
+            errors["narratorGuide"] = [$"The full narrator guide cannot exceed {NarratorGuideLimits.MaximumCharacters} characters."];
         }
 
         foreach (var (field, messages) in ParentControlsRequestValidator.Validate(

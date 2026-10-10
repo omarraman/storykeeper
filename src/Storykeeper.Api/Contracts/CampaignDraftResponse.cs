@@ -10,6 +10,7 @@ public sealed record CampaignDraftResponse(
     string Status,
     int GenerationNumber,
     CampaignDraftContent Content,
+    DateTimeOffset? ApprovedAtUtc,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc,
     DateTimeOffset? ActivatedAtUtc)
@@ -24,6 +25,7 @@ public sealed record CampaignDraftResponse(
         draft.GenerationNumber,
         JsonSerializer.Deserialize<CampaignDraftContent>(draft.ContentJson, JsonOptions)
             ?? throw new JsonException("Stored campaign draft content was empty."),
+        draft.ApprovedAtUtc,
         draft.CreatedAtUtc,
         draft.UpdatedAtUtc,
         draft.ActivatedAtUtc);

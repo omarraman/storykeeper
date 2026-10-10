@@ -36,6 +36,11 @@ public sealed class StoryTurnService(
             throw new RuleConflictException("Story actions can only be sent to an active campaign.");
         }
 
+        var approvedNarratorGuide = await dbContext.CampaignNarratorGuides.AsNoTracking()
+            .Where(guide => guide.CampaignId == campaignId && guide.ActiveRevision > 0)
+            .Select(guide => guide.ActiveText)
+            .SingleOrDefaultAsync(cancellationToken);
+
         var session = await dbContext.Sessions.AsNoTracking()
             .SingleOrDefaultAsync(item =>
                 item.CampaignId == campaignId && item.Id == request.SessionId, cancellationToken);
@@ -182,6 +187,7 @@ public sealed class StoryTurnService(
                 world = Limit(campaign.Bible?.WorldDescription, 1800),
                 currentSituation = Limit(campaign.Bible?.CurrentSituation, 1000)
             },
+            privateNarratorGuide = approvedNarratorGuide,
             currentSession = new
             {
                 session.SessionNumber,

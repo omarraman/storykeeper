@@ -187,12 +187,23 @@ public sealed class CampaignDraftTests
             }),
             NullLogger<OpenAiCompatibleCampaignDraftGenerator>.Instance);
 
-        var content = await generator.GenerateAsync(new CampaignBrief { Title = "My world" });
+        const string guide = "A private authored truth.\r\nFINAL GUIDE SENTINEL";
+        var content = await generator.GenerateAsync(new CampaignBrief
+        {
+            Title = "My world",
+            StoryIdea = "A short seed.",
+            NarratorGuide = guide
+        });
 
         Assert.Equal(expected.Title, content.Title);
         Assert.Equal(3, content.Npcs!.Count);
         Assert.Equal("https://example.test/v1/chat/completions", handler.RequestUri!.AbsoluteUri);
         using var requestDocument = JsonDocument.Parse(handler.RequestBody!);
+        var messages = requestDocument.RootElement.GetProperty("messages").EnumerateArray().ToArray();
+        Assert.Equal("system", messages[0].GetProperty("role").GetString());
+        using var input = JsonDocument.Parse(messages[1].GetProperty("content").GetString()!);
+        Assert.Equal("A short seed.", input.RootElement.GetProperty("storyIdea").GetString());
+        Assert.Equal(guide, input.RootElement.GetProperty("authoredGuide").GetString());
         Assert.Equal("text",
             requestDocument.RootElement.GetProperty("response_format").GetProperty("type").GetString());
         Assert.Equal("Bearer server-only-test-key", handler.Authorization);

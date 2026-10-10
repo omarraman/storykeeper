@@ -23,4 +23,5 @@ public sealed class Campaign
     public ICollection<Session> Sessions { get; set; } = new List<Session>();
     public ICollection<Npc> Npcs { get; set; } = new List<Npc>();
     public ICollection<Location> Locations { get; set; } = new List<Location>();
+    public ICollection<CampaignNarratorGuide> NarratorGuides { get; set; } = new List<CampaignNarratorGuide>();
 }

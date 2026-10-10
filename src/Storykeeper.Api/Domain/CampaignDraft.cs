@@ -16,8 +16,10 @@ public sealed class CampaignDraft
     public CampaignDraftStatus Status { get; set; } = CampaignDraftStatus.PendingReview;
     public int GenerationNumber { get; set; } = 1;
     public string ContentJson { get; set; } = "{}";
+    public string? NarratorGuide { get; set; }
     public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset? ApprovedAtUtc { get; set; }
     public DateTimeOffset? ActivatedAtUtc { get; set; }
 }
 

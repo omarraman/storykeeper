@@ -44,3 +44,9 @@ contains provider API credentials, server configuration, database connection
 strings, or the parent PIN. `POST /api/campaigns/import` accepts the exported
 JSON body and returns the restored campaign ID. Exporting and importing
 creates a separate backup copy; it does not merge campaigns.
+
+Ordinary campaign export and storybook output deliberately exclude full
+narrator guides, including active, pending, and draft source text. No private
+guide backup option is implemented in this version, so imports do not restore
+guides. Parents who need to preserve authored source should keep their own
+private copy.

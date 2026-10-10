@@ -40,6 +40,7 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
     public DbSet<Campaign> Campaigns => Set<Campaign>();
     public DbSet<CampaignBrief> CampaignBriefs => Set<CampaignBrief>();
     public DbSet<CampaignDraft> CampaignDrafts => Set<CampaignDraft>();
+    public DbSet<CampaignNarratorGuide> CampaignNarratorGuides => Set<CampaignNarratorGuide>();
     public DbSet<AdventureDraft> AdventureDrafts => Set<AdventureDraft>();
     public DbSet<CampaignBibleVersion> CampaignBibleVersions => Set<CampaignBibleVersion>();
     public DbSet<CampaignSettings> CampaignSettings => Set<CampaignSettings>();
@@ -67,6 +68,7 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
             entity.Property(brief => brief.Genre).HasMaxLength(100).IsRequired();
             entity.Property(brief => brief.Tone).HasMaxLength(300).IsRequired();
             entity.Property(brief => brief.StoryIdea).HasMaxLength(2000);
+            entity.Property(brief => brief.NarratorGuide).HasMaxLength(NarratorGuideLimits.MaximumCharacters);
             entity.Property(brief => brief.Inclusions)
                 .HasConversion(values => JsonSerializer.Serialize(values, (JsonSerializerOptions?)null),
                     value => JsonSerializer.Deserialize<List<string>>(value, (JsonSerializerOptions?)null) ?? new List<string>())
@@ -90,6 +92,7 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
         {
             entity.HasKey(draft => draft.Id);
             entity.Property(draft => draft.ContentJson).HasMaxLength(30000).IsRequired();
+            entity.Property(draft => draft.NarratorGuide).HasMaxLength(NarratorGuideLimits.MaximumCharacters);
             entity.HasOne(draft => draft.CampaignBrief)
                 .WithMany(brief => brief.Drafts)
                 .HasForeignKey(draft => draft.CampaignBriefId)
@@ -100,6 +103,20 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(draft => draft.CampaignBriefId);
         });
+
+        ConfigureCampaignEntity<CampaignNarratorGuide>(modelBuilder, entity =>
+        {
+            entity.Property(guide => guide.ActiveText).HasMaxLength(NarratorGuideLimits.MaximumCharacters);
+            entity.Property(guide => guide.PendingText)
+                .HasMaxLength(NarratorGuideLimits.MaximumCharacters)
+                .IsRequired();
+            entity.ToTable(table =>
+            {
+                table.HasCheckConstraint("CK_CampaignNarratorGuides_ActiveRevision", "ActiveRevision >= 0");
+                table.HasCheckConstraint("CK_CampaignNarratorGuides_PendingRevision", "PendingRevision >= 0");
+            });
+            entity.HasIndex(guide => guide.CampaignId).IsUnique();
+        }, campaignNavigation: campaign => campaign.NarratorGuides);
 
         modelBuilder.Entity<AdventureDraft>(entity =>
         {

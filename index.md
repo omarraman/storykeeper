@@ -20,6 +20,8 @@ Current implementation focus:
   server-enforced child-safety boundaries.
 - Structured AI campaign drafts with parent review, editing, approval,
   isolated activation, and versioned campaign bibles.
+- Parent-only, verbatim narrator guides for authored campaigns, with pending
+  approval for edits, campaign-scoped turn context, and player/export privacy.
 - Campaign-scoped next-adventure plans with selected pacing, parent review,
   editable regeneration, and activation into saved quests.
 - Tablet-friendly campaign library with create, list, complete, archive,

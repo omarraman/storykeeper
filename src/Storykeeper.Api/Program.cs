@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Http.Features;
 using Storykeeper.Api.Data;
 using Storykeeper.Api.Contracts;
 using Storykeeper.Api.Domain;
@@ -46,6 +47,7 @@ builder.Services.AddScoped<ICampaignService, CampaignService>();
 builder.Services.AddScoped<CampaignArchiveService>();
 builder.Services.AddScoped<IGameRulesService, GameRulesService>();
 builder.Services.AddScoped<ICampaignBriefService, CampaignBriefService>();
+builder.Services.AddScoped<CampaignNarratorGuideService>();
 builder.Services.AddScoped<ICampaignContinuityService, CampaignContinuityService>();
 builder.Services.Configure<StorykeeperAiOptions>(builder.Configuration.GetSection("Storykeeper:Ai"));
 builder.Services.Configure<TextToSpeechOptions>(builder.Configuration.GetSection("TextToSpeech"));
@@ -90,6 +92,26 @@ builder.Services.AddHttpClient<IStoryTurnGenerator, OpenAiCompatibleStoryTurnGen
 builder.Services.AddScoped<IStoryTurnService, StoryTurnService>();
 
 var app = builder.Build();
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/api/campaign-briefs") ||
+        context.Request.Path.Value?.Contains("/narrator-guide", StringComparison.Ordinal) == true)
+    {
+        if (context.Request.ContentLength > NarratorGuideLimits.MaximumUploadRequestBytes * 4)
+        {
+            context.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
+            return;
+        }
+
+        var requestSizeFeature = context.Features.Get<IHttpMaxRequestBodySizeFeature>();
+        if (requestSizeFeature is { IsReadOnly: false })
+        {
+            requestSizeFeature.MaxRequestBodySize = NarratorGuideLimits.MaximumUploadRequestBytes * 4;
+        }
+    }
+
+    await next();
+});
 app.UseRateLimiter();
 
 await using (var scope = app.Services.CreateAsyncScope())
@@ -858,6 +880,42 @@ app.MapGet("/api/campaign-briefs/{briefId:guid}", async (
     return brief is null ? Results.NotFound() : Results.Ok(CampaignBriefResponse.From(brief));
 });
 
+app.MapGet("/api/campaign-briefs/{briefId:guid}/narrator-guide", async (
+    Guid briefId,
+    HttpRequest httpRequest,
+    IConfiguration configuration,
+    StorykeeperDbContext dbContext,
+    CancellationToken cancellationToken) =>
+{
+    var pinError = ValidateParentPin(httpRequest, configuration);
+    if (pinError is not null) return pinError;
+    var brief = await dbContext.CampaignBriefs.AsNoTracking()
+        .SingleOrDefaultAsync(item => item.Id == briefId, cancellationToken);
+    return brief is null ? Results.NotFound() : Results.Ok(new { text = brief.NarratorGuide });
+}).RequireRateLimiting("parent-pin");
+
+app.MapPut("/api/campaign-briefs/{briefId:guid}/narrator-guide", async (
+    Guid briefId,
+    SaveNarratorGuideRequest? request,
+    HttpRequest httpRequest,
+    IConfiguration configuration,
+    ICampaignBriefService briefs,
+    CancellationToken cancellationToken) =>
+{
+    var pinError = ValidateParentPin(httpRequest, configuration);
+    if (pinError is not null) return pinError;
+    if (request?.Text?.Length > NarratorGuideLimits.MaximumCharacters)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["text"] = [$"The full narrator guide cannot exceed {NarratorGuideLimits.MaximumCharacters} characters."]
+        });
+    }
+
+    var brief = await briefs.UpdateNarratorGuideAsync(briefId, request?.Text, cancellationToken);
+    return brief is null ? Results.NotFound() : Results.NoContent();
+}).RequireRateLimiting("parent-pin");
+
 app.MapGet("/api/campaign-drafts", async (
     ICampaignDraftService drafts,
     CancellationToken cancellationToken) =>
@@ -865,9 +923,13 @@ app.MapGet("/api/campaign-drafts", async (
 
 app.MapPost("/api/campaign-briefs/{briefId:guid}/drafts", async (
     Guid briefId,
+    HttpRequest httpRequest,
+    IConfiguration configuration,
     ICampaignDraftService drafts,
     CancellationToken cancellationToken) =>
 {
+    var pinError = ValidateParentPin(httpRequest, configuration);
+    if (pinError is not null) return pinError;
     try
     {
         var draft = await drafts.GenerateAsync(briefId, cancellationToken);
@@ -883,7 +945,7 @@ app.MapPost("/api/campaign-briefs/{briefId:guid}/drafts", async (
     {
         return Results.ValidationProblem(exception.Errors, statusCode: 422, title: "Campaign draft rejected", detail: exception.Message);
     }
-});
+}).RequireRateLimiting("parent-pin");
 
 app.MapGet("/api/campaign-drafts/{draftId:guid}", async (
     Guid draftId,
@@ -894,11 +956,48 @@ app.MapGet("/api/campaign-drafts/{draftId:guid}", async (
     return draft is null ? Results.NotFound() : Results.Ok(CampaignDraftResponse.From(draft));
 });
 
-app.MapPost("/api/campaign-drafts/{draftId:guid}/regenerate", async (
+app.MapGet("/api/campaign-drafts/{draftId:guid}/narrator-guide", async (
     Guid draftId,
+    HttpRequest httpRequest,
+    IConfiguration configuration,
     ICampaignDraftService drafts,
     CancellationToken cancellationToken) =>
 {
+    var pinError = ValidateParentPin(httpRequest, configuration);
+    if (pinError is not null) return pinError;
+    var draft = await drafts.GetAsync(draftId, cancellationToken);
+    return draft is null ? Results.NotFound() : Results.Ok(new { text = draft.NarratorGuide });
+}).RequireRateLimiting("parent-pin");
+
+app.MapPut("/api/campaign-drafts/{draftId:guid}/narrator-guide", async (
+    Guid draftId,
+    SaveNarratorGuideRequest? request,
+    HttpRequest httpRequest,
+    IConfiguration configuration,
+    ICampaignDraftService drafts,
+    CancellationToken cancellationToken) =>
+{
+    var pinError = ValidateParentPin(httpRequest, configuration);
+    if (pinError is not null) return pinError;
+    var result = await drafts.UpdateNarratorGuideAsync(draftId, request?.Text, cancellationToken);
+    return result.Status switch
+    {
+        CampaignDraftOperationStatus.NotFound => Results.NotFound(),
+        CampaignDraftOperationStatus.AlreadyActivated => Results.Problem(
+            statusCode: 409, title: "Draft already activated", detail: "Activated draft guides cannot be changed."),
+        _ => Results.Ok(CampaignDraftResponse.From(result.Draft!))
+    };
+}).RequireRateLimiting("parent-pin");
+
+app.MapPost("/api/campaign-drafts/{draftId:guid}/regenerate", async (
+    Guid draftId,
+    HttpRequest httpRequest,
+    IConfiguration configuration,
+    ICampaignDraftService drafts,
+    CancellationToken cancellationToken) =>
+{
+    var pinError = ValidateParentPin(httpRequest, configuration);
+    if (pinError is not null) return pinError;
     try
     {
         var result = await drafts.RegenerateAsync(draftId, cancellationToken);
@@ -918,7 +1017,7 @@ app.MapPost("/api/campaign-drafts/{draftId:guid}/regenerate", async (
     {
         return Results.ValidationProblem(exception.Errors, statusCode: 422, title: "Campaign draft rejected", detail: exception.Message);
     }
-});
+}).RequireRateLimiting("parent-pin");
 
 app.MapPut("/api/campaign-drafts/{draftId:guid}", async (
     Guid draftId,
@@ -944,9 +1043,13 @@ app.MapPut("/api/campaign-drafts/{draftId:guid}", async (
 
 app.MapPost("/api/campaign-drafts/{draftId:guid}/approve", async (
     Guid draftId,
+    HttpRequest httpRequest,
+    IConfiguration configuration,
     ICampaignDraftService drafts,
     CancellationToken cancellationToken) =>
 {
+    var pinError = ValidateParentPin(httpRequest, configuration);
+    if (pinError is not null) return pinError;
     try
     {
         var result = await drafts.ApproveAsync(draftId, cancellationToken);
@@ -962,13 +1065,17 @@ app.MapPost("/api/campaign-drafts/{draftId:guid}/approve", async (
     {
         return Results.ValidationProblem(exception.Errors, statusCode: 422, title: "Campaign draft rejected", detail: exception.Message);
     }
-});
+}).RequireRateLimiting("parent-pin");
 
 app.MapPost("/api/campaign-drafts/{draftId:guid}/activate", async (
     Guid draftId,
+    HttpRequest httpRequest,
+    IConfiguration configuration,
     ICampaignDraftService drafts,
     CancellationToken cancellationToken) =>
 {
+    var pinError = ValidateParentPin(httpRequest, configuration);
+    if (pinError is not null) return pinError;
     var result = await drafts.ActivateAsync(draftId, cancellationToken);
     return result.Status switch
     {
@@ -979,13 +1086,17 @@ app.MapPost("/api/campaign-drafts/{draftId:guid}/activate", async (
             statusCode: 409, title: "Draft already activated", detail: "This draft has already created a story world."),
         _ => Results.Created($"/api/campaigns/{result.Campaign!.Id}", CampaignResponse.From(result.Campaign))
     };
-});
+}).RequireRateLimiting("parent-pin");
 
 app.MapDelete("/api/campaign-drafts/{draftId:guid}", async (
     Guid draftId,
+    HttpRequest httpRequest,
+    IConfiguration configuration,
     ICampaignDraftService drafts,
     CancellationToken cancellationToken) =>
 {
+    var pinError = ValidateParentPin(httpRequest, configuration);
+    if (pinError is not null) return pinError;
     var result = await drafts.DeleteAsync(draftId, cancellationToken);
     return result.Status switch
     {
@@ -994,7 +1105,7 @@ app.MapDelete("/api/campaign-drafts/{draftId:guid}", async (
             statusCode: 409, title: "Draft already activated", detail: "Activated drafts cannot be discarded."),
         _ => Results.NoContent()
     };
-});
+}).RequireRateLimiting("parent-pin");
 
 app.MapGet("/api/campaigns/{campaignId:guid}/bible-versions", async (
     Guid campaignId,
@@ -1006,6 +1117,100 @@ app.MapGet("/api/campaigns/{campaignId:guid}/bible-versions", async (
         ? Results.NotFound()
         : Results.Ok(versions.Select(CampaignBibleVersionResponse.From));
 });
+
+app.MapGet("/api/campaigns/{campaignId:guid}/narrator-guide", async (
+    Guid campaignId,
+    HttpRequest httpRequest,
+    IConfiguration configuration,
+    CampaignNarratorGuideService guides,
+    CancellationToken cancellationToken) =>
+{
+    var pinError = ValidateParentPin(httpRequest, configuration);
+    if (pinError is not null) return pinError;
+    var guide = await guides.GetAsync(campaignId, cancellationToken);
+    return guide is null && !await guides.CampaignExistsAsync(campaignId, cancellationToken)
+        ? Results.NotFound()
+        : Results.Ok(CampaignNarratorGuideResponse.From(guide));
+}).RequireRateLimiting("parent-pin");
+
+app.MapPut("/api/campaigns/{campaignId:guid}/narrator-guide/pending", async (
+    Guid campaignId,
+    SaveNarratorGuideRequest? request,
+    HttpRequest httpRequest,
+    IConfiguration configuration,
+    CampaignNarratorGuideService guides,
+    CancellationToken cancellationToken) =>
+{
+    var pinError = ValidateParentPin(httpRequest, configuration);
+    if (pinError is not null) return pinError;
+    if (request?.Text is null || string.IsNullOrWhiteSpace(request.Text))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["text"] = ["Enter guide text. Use the explicit removal control to remove an active guide."]
+        });
+    }
+
+    if (request.Text.Length > NarratorGuideLimits.MaximumCharacters)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["text"] = [$"The full narrator guide cannot exceed {NarratorGuideLimits.MaximumCharacters} characters."]
+        });
+    }
+
+    var result = await guides.SavePendingAsync(campaignId, request.Text, cancellationToken);
+    return result.Status switch
+    {
+        NarratorGuideOperationStatus.NotFound => Results.NotFound(),
+        NarratorGuideOperationStatus.SessionRunning => Results.Problem(
+            statusCode: 409, title: "Adventure session is running",
+            detail: "End the current session before changing the narrator guide. The session was not ended."),
+        _ => Results.Ok(CampaignNarratorGuideResponse.From(result.Guide))
+    };
+}).RequireRateLimiting("parent-pin");
+
+app.MapPost("/api/campaigns/{campaignId:guid}/narrator-guide/approve", async (
+    Guid campaignId,
+    HttpRequest httpRequest,
+    IConfiguration configuration,
+    CampaignNarratorGuideService guides,
+    CancellationToken cancellationToken) =>
+{
+    var pinError = ValidateParentPin(httpRequest, configuration);
+    if (pinError is not null) return pinError;
+    var result = await guides.ApproveAsync(campaignId, cancellationToken);
+    return result.Status switch
+    {
+        NarratorGuideOperationStatus.NotFound => Results.NotFound(),
+        NarratorGuideOperationStatus.SessionRunning => Results.Problem(
+            statusCode: 409, title: "Adventure session is running",
+            detail: "End the current session before approving the narrator guide. The session was not ended."),
+        NarratorGuideOperationStatus.NoPendingRevision => Results.Problem(
+            statusCode: 409, title: "No pending guide", detail: "Save a pending guide revision before approving it."),
+        _ => Results.Ok(CampaignNarratorGuideResponse.From(result.Guide))
+    };
+}).RequireRateLimiting("parent-pin");
+
+app.MapDelete("/api/campaigns/{campaignId:guid}/narrator-guide", async (
+    Guid campaignId,
+    HttpRequest httpRequest,
+    IConfiguration configuration,
+    CampaignNarratorGuideService guides,
+    CancellationToken cancellationToken) =>
+{
+    var pinError = ValidateParentPin(httpRequest, configuration);
+    if (pinError is not null) return pinError;
+    var result = await guides.RemoveAsync(campaignId, cancellationToken);
+    return result.Status switch
+    {
+        NarratorGuideOperationStatus.NotFound => Results.NotFound(),
+        NarratorGuideOperationStatus.SessionRunning => Results.Problem(
+            statusCode: 409, title: "Adventure session is running",
+            detail: "End the current session before removing the narrator guide. The session was not ended."),
+        _ => Results.NoContent()
+    };
+}).RequireRateLimiting("parent-pin");
 
 app.MapPut("/api/campaign-briefs/{briefId:guid}", async (
     Guid briefId,
@@ -1030,9 +1235,15 @@ app.MapPut("/api/campaign-briefs/{briefId:guid}", async (
 
 app.MapDelete("/api/campaign-briefs/{briefId:guid}", async (
     Guid briefId,
+    HttpRequest httpRequest,
+    IConfiguration configuration,
     ICampaignBriefService briefs,
     CancellationToken cancellationToken) =>
-    await briefs.DeleteAsync(briefId, cancellationToken) ? Results.NoContent() : Results.NotFound());
+{
+    var pinError = ValidateParentPin(httpRequest, configuration);
+    if (pinError is not null) return pinError;
+    return await briefs.DeleteAsync(briefId, cancellationToken) ? Results.NoContent() : Results.NotFound();
+}).RequireRateLimiting("parent-pin");
 
 app.MapPost("/api/campaigns", async (
     CreateCampaignRequest? request,

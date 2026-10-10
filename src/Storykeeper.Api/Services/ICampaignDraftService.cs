@@ -28,6 +28,10 @@ public interface ICampaignDraftService
     Task<CampaignDraft?> GenerateAsync(Guid briefId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<CampaignDraft>> ListAsync(CancellationToken cancellationToken = default);
     Task<CampaignDraft?> GetAsync(Guid draftId, CancellationToken cancellationToken = default);
+    Task<CampaignDraftOperationResult> UpdateNarratorGuideAsync(
+        Guid draftId,
+        string? narratorGuide,
+        CancellationToken cancellationToken = default);
     Task<CampaignDraftOperationResult> RegenerateAsync(Guid draftId, CancellationToken cancellationToken = default);
     Task<CampaignDraftOperationResult> UpdateAsync(
         Guid draftId,

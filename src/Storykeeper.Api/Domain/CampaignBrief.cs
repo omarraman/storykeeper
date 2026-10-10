@@ -23,6 +23,7 @@ public sealed class CampaignBrief
     public List<string> Inclusions { get; set; } = [];
     public List<string> Exclusions { get; set; } = [];
     public string? StoryIdea { get; set; }
+    public string? NarratorGuide { get; set; }
     public List<string> SafetyBoundaries { get; set; } = CampaignBriefDefaults.SafetyBoundaries.ToList();
     public ParentSafetySettings SafetySettings { get; set; } = ParentSafetySettings.Defaults;
     public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;

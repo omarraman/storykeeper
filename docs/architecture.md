@@ -68,6 +68,13 @@ and delete operations with server-side request validation and server-owned
 safety boundaries. A brief is not a campaign and is not converted into
 campaign state until a later generation and approval workflow.
 
+The optional full narrator guide is stored separately from story sparks and
+generated campaign content. Parent-PIN-protected guide endpoints save pending
+campaign revisions and explicitly apply them only between sessions. Campaign
+draft guides are likewise kept outside generated content and copied verbatim
+to the active campaign on approved activation. Player-facing DTOs and ordinary
+exports do not include guide text.
+
 Parents can generate campaign-scoped adventure drafts from the campaign room.
 The API builds continuity context from that campaign's bible, active facts,
 recent saved session summaries, quests, NPCs, and locations. Reviewed,

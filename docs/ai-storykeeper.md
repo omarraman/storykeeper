@@ -23,6 +23,15 @@ campaign records.
 If the current quest came from a reviewed adventure draft, its stored opening,
 scenes, solution paths, clues, featured NPC, finale, reward, and pacing target
 are included so narration can follow the approved episode structure.
+The campaign's complete approved `privateNarratorGuide`, if present, is added
+as a distinct context member without the short-field truncation helpers. Only
+the active approved revision for this campaign is loaded; a pending revision
+and every other campaign's guide are excluded. The guide is authored private
+planned truth, not proof that players discovered its clues or know its
+resolutions. It constrains authored story development; structured plans
+elaborate within those constraints, while accepted history records what
+actually happened. Materially incompatible revisions or plans require parent
+correction rather than silently rewriting history.
 Server-loaded parent safety settings and the current one-turn parent
 direction are included as well. Paused sessions are rejected before any
 provider request is made.
@@ -35,6 +44,16 @@ completed. Recent turns are provider-only context and are not returned as
 player-visible hidden-guide content. The provider receives the player's
 current action and saved story context as untrusted content under a stable
 child-safety narrator prompt.
+
+The guide remains ordinary untrusted context data, never a system message or
+replacement for `SystemPrompt`. Its content cannot change safety rules,
+server-authoritative check results, the output contract, or player agency. This
+boundary does not guarantee spoiler prevention or model adherence. The full
+guide is resent every turn without per-turn summarization or rewriting, so a
+long guide increases provider token usage. The 30,000-character authoring
+limit is not a fixed token estimate. "Private" means hidden from player
+clients, not hidden from the configured AI provider; hosted providers receive
+it.
 
 Accepted StoryBeats persist the trimmed action, optional acting hero ID,
 validated NPC dialogue JSON, optional check-resolution ID, and a per-session
