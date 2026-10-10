@@ -61,6 +61,35 @@ public sealed class CampaignPersistenceTests
     }
 
     [Fact]
+    public async Task NarratedPlaybackSettingsDefaultOffAndPersistPerCampaign()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var campaign = await new CampaignService(new CampaignRepository(database.Context))
+            .CreateAsync("Narration World", null);
+        var settings = await database.Context.CampaignSettings
+            .SingleAsync(item => item.CampaignId == campaign.Id);
+
+        Assert.False(settings.SafetySettings.TextToSpeechEnabled);
+        Assert.Equal(TextToSpeechProviderKind.Disabled, settings.SafetySettings.NarrationProvider);
+        Assert.Equal(NarrationPlaybackPreference.Off, settings.SafetySettings.NarrationPlayback);
+
+        settings.SafetySettings = settings.SafetySettings with
+        {
+            TextToSpeechEnabled = true,
+            NarrationProvider = TextToSpeechProviderKind.Piper,
+            NarrationPlayback = NarrationPlaybackPreference.AutoplayAfterNewStoryBeat
+        };
+        await database.Context.SaveChangesAsync();
+        database.Context.ChangeTracker.Clear();
+
+        var reloaded = await database.Context.CampaignSettings
+            .SingleAsync(item => item.CampaignId == campaign.Id);
+        Assert.True(reloaded.SafetySettings.TextToSpeechEnabled);
+        Assert.Equal(TextToSpeechProviderKind.Piper, reloaded.SafetySettings.NarrationProvider);
+        Assert.Equal(NarrationPlaybackPreference.AutoplayAfterNewStoryBeat, reloaded.SafetySettings.NarrationPlayback);
+    }
+
+    [Fact]
     public async Task CampaignEntitiesAreReadOnlyWithinTheirOwningCampaign()
     {
         await using var database = await TestDatabase.CreateAsync();

@@ -506,10 +506,17 @@ public static class CampaignArchiveValidator
             IsUnsafe(archive.Settings.Theme) || IsUnsafe(archive.Settings.Tone) ||
             !Enum.IsDefined(archive.Settings.SafetySettings.FearLevel) ||
             !Enum.IsDefined(archive.Settings.SafetySettings.CombatMode) ||
+            !Enum.IsDefined(archive.Settings.SafetySettings.NarrationProvider) ||
+            !Enum.IsDefined(archive.Settings.SafetySettings.NarrationPlayback) ||
             archive.Settings.SafetySettings.ExcludedContent is null ||
             archive.Settings.SafetySettings.ExcludedContent.Count > 50 ||
             archive.Settings.SafetySettings.ExcludedContent.Any(value =>
                 string.IsNullOrWhiteSpace(value) || value.Length > 100) ||
+            (archive.Settings.SafetySettings.TextToSpeechEnabled &&
+             (archive.Settings.SafetySettings.NarrationProvider == TextToSpeechProviderKind.Disabled ||
+              archive.Settings.SafetySettings.NarrationPlayback == NarrationPlaybackPreference.Off)) ||
+            (!archive.Settings.SafetySettings.TextToSpeechEnabled &&
+             archive.Settings.SafetySettings.NarrationPlayback != NarrationPlaybackPreference.Off) ||
             archive.Settings.SafetySettings.MaxNarrationWords is < 40 or > 150 ||
             archive.Settings.SafetySettings.SessionLengthMinutes is < 15 or > 180)
         {

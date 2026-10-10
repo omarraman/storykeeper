@@ -9,7 +9,8 @@ import type {
 } from './contracts'
 import { campaignContinuityClient, type CampaignContinuityClient } from './continuityClient'
 import { ParentControlsPanel } from './ParentControlsPanel'
-import { supportsNarrationPlayback, useVoiceInput } from './voiceInput'
+import { useVoiceInput } from './voiceInput'
+import { fetchNarrationAudio, isAbortError } from './narrationAudio'
 import './AdventurePlayScreen.css'
 
 const difficultyTargets: Record<CheckDifficulty, number> = { Easy: 8, Tricky: 12, Heroic: 16 }
@@ -55,11 +56,20 @@ export function AdventurePlayScreen({
   const [summaryError, setSummaryError] = useState('')
   const [showWrapUp, setShowWrapUp] = useState(false)
   const [storyPaused, setStoryPaused] = useState(campaign.latestSession?.isPaused ?? false)
-  const [narrationState, setNarrationState] = useState<'idle' | 'speaking' | 'paused'>('idle')
+  const [narrationState, setNarrationState] = useState<'idle' | 'loading' | 'speaking' | 'paused'>('idle')
   const [playbackMessage, setPlaybackMessage] = useState('')
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
+  const [narrationMuted, setNarrationMuted] = useState(false)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const audioUrlRef = useRef<string | null>(null)
+  const audioRequestRef = useRef<AbortController | null>(null)
+  const previousStoryBeatIdRef = useRef(storyBeat.id)
 
   const voiceEnabled = state.mode === 'campaign' && (campaign.safetySettings?.voiceEnabled ?? false)
+  const narrationPlayback = campaign.safetySettings?.narrationPlayback ?? 'off'
+  const narrationPlaybackEnabled = state.mode === 'campaign' &&
+    (campaign.safetySettings?.textToSpeechEnabled ?? false) &&
+    campaign.safetySettings?.narrationProvider !== 'disabled' &&
+    narrationPlayback !== 'off'
   const voiceInput = useVoiceInput(voiceEnabled, setActionText)
   const pendingRoll = turn.type === 'roll_required' ? turn.rollRequired : null
   const selectedHero = state.heroes.find((hero) => hero.id === selectedHeroId) ?? state.heroes[0]
@@ -80,60 +90,142 @@ export function AdventurePlayScreen({
   )
 
   const stopNarration = () => {
-    if (supportsNarrationPlayback()) window.speechSynthesis.cancel()
-    utteranceRef.current = null
+    audioRequestRef.current?.abort()
+    audioRequestRef.current = null
+    const audio = audioRef.current
+    if (audio) {
+      audio.pause()
+      audio.currentTime = 0
+    }
     setNarrationState('idle')
   }
 
-  const speakNarration = () => {
-    if (!supportsNarrationPlayback()) {
-      setPlaybackMessage('Narrated playback is not available in this browser. The narration text is still here to read.')
-      return
+  const clearNarration = () => {
+    stopNarration()
+    audioRef.current?.removeAttribute('src')
+    if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current)
+    audioUrlRef.current = null
+    setPlaybackMessage('')
+  }
+
+  const playNarration = async (replay = false) => {
+    const audio = audioRef.current
+    if (!audio) return
+    setPlaybackMessage('')
+
+    if (!audio.src) {
+      if (!/^(?:[0-9a-f]{32}|[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12})$/i.test(storyBeat.id)) {
+        setPlaybackMessage('Narrated playback is not available for this opening scene. The story text is still here to read.')
+        return
+      }
+
+      const controller = new AbortController()
+      audioRequestRef.current = controller
+      setNarrationState('loading')
+      try {
+        const blob = await fetchNarrationAudio(campaign.id, sessionId, storyBeat.id, controller.signal)
+        if (controller.signal.aborted) return
+        const url = URL.createObjectURL(blob)
+        if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current)
+        audioUrlRef.current = url
+        audio.src = url
+        audio.load()
+      } catch (loadError) {
+        if (!isAbortError(loadError)) {
+          setPlaybackMessage(loadError instanceof Error
+            ? `${loadError.message} The story text is still here to read.`
+            : 'Narrated playback could not be loaded. The story text is still here to read.')
+        }
+        setNarrationState('idle')
+        return
+      } finally {
+        if (audioRequestRef.current === controller) audioRequestRef.current = null
+      }
     }
 
-    stopNarration()
-    const text = [
-      storyBeat.speaker,
-      storyBeat.narration,
-      ...(storyBeat.npcDialogue ?? []).map((line) => `${line.npcName} says: ${line.text}`),
-    ].filter(Boolean).join('. ')
+    if (replay) audio.currentTime = 0
     try {
-      const utterance = new SpeechSynthesisUtterance(text)
-      utterance.onend = () => {
-        if (utteranceRef.current === utterance) {
-          utteranceRef.current = null
-          setNarrationState('idle')
-        }
-      }
-      utterance.onerror = () => {
-        if (utteranceRef.current === utterance) {
-          utteranceRef.current = null
-          setNarrationState('idle')
-          setPlaybackMessage('Narrated playback stopped. The narration text is still here to read.')
-        }
-      }
-      utteranceRef.current = utterance
-      window.speechSynthesis.speak(utterance)
-      setPlaybackMessage('')
+      await audio.play()
       setNarrationState('speaking')
     } catch {
-      utteranceRef.current = null
       setNarrationState('idle')
-      setPlaybackMessage('Narrated playback could not start. The narration text is still here to read.')
+      setPlaybackMessage('Narrated playback could not start in this browser. The story text is still here to read.')
     }
   }
 
+  const pauseNarration = () => {
+    audioRef.current?.pause()
+    setNarrationState('paused')
+  }
+
+  const toggleNarrationMute = () => {
+    const muted = !narrationMuted
+    setNarrationMuted(muted)
+    if (audioRef.current) audioRef.current.muted = muted
+  }
+
   useEffect(() => {
-    if (!voiceEnabled) {
-      if (supportsNarrationPlayback()) window.speechSynthesis.cancel()
-      utteranceRef.current = null
-      setNarrationState('idle')
+    if (previousStoryBeatIdRef.current === storyBeat.id) return
+    previousStoryBeatIdRef.current = storyBeat.id
+    clearNarration()
+    if (narrationPlayback === 'autoplayAfterNewStoryBeat') {
+      void playNarration()
     }
-  }, [voiceEnabled])
+  }, [storyBeat.id, narrationPlayback])
 
   useEffect(() => () => {
-    if (supportsNarrationPlayback()) window.speechSynthesis.cancel()
+    audioRequestRef.current?.abort()
+    audioRef.current?.pause()
+    if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current)
   }, [])
+
+  const handleAudioEnded = () => {
+    setNarrationState('idle')
+  }
+
+  const handleAudioError = () => {
+    setNarrationState('idle')
+    setPlaybackMessage('Narrated playback stopped. The story text is still here to read.')
+  }
+
+  const onNarrationSettingOff = !narrationPlaybackEnabled
+  useEffect(() => {
+    if (onNarrationSettingOff) stopNarration()
+  }, [onNarrationSettingOff])
+
+  /*
+   * Keep the opening narration text-first: only IDs issued by the server for
+   * validated StoryBeats can request audio.
+   */
+  const renderNarrationControls = () => {
+    if (!narrationPlaybackEnabled) return null
+    return (
+      <div className="narration-voice-controls" aria-label="Narration playback controls">
+        <button type="button" className="button button-secondary" onClick={() => void playNarration()}
+          disabled={narrationState === 'loading'} aria-label="Listen to narration">
+          {narrationState === 'loading' ? 'Loading audio…' : 'Listen'}
+        </button>
+        <button type="button" className="button button-secondary" onClick={pauseNarration}
+          disabled={narrationState !== 'speaking'} aria-label="Pause narration">
+          Pause
+        </button>
+        <button type="button" className="button button-secondary" onClick={stopNarration}
+          disabled={narrationState === 'idle'} aria-label="Stop narration">
+          Stop
+        </button>
+        <button type="button" className="button button-secondary" onClick={() => void playNarration(true)}
+          disabled={narrationState === 'loading' || !audioRef.current?.src} aria-label="Replay narration">
+          Replay
+        </button>
+        <button type="button" className="button button-secondary" onClick={toggleNarrationMute}
+          aria-pressed={narrationMuted} aria-label={narrationMuted ? 'Unmute narration' : 'Mute narration'}>
+          {narrationMuted ? 'Unmute' : 'Mute'}
+        </button>
+        {playbackMessage && <span role="status">{playbackMessage}</span>}
+        <audio ref={audioRef} muted={narrationMuted} onEnded={handleAudioEnded} onError={handleAudioError} />
+      </div>
+    )
+  }
 
   const submitAction = async (action: string, choiceId: string | null): Promise<boolean> => {
     if (storyPaused) {
@@ -198,6 +290,7 @@ export function AdventurePlayScreen({
       return
     }
 
+    stopNarration()
     setBusy(true)
     setError('')
     try {
@@ -309,6 +402,9 @@ export function AdventurePlayScreen({
             fearLevel: 'low',
             combatMode: 'avoid',
             voiceEnabled: false,
+            textToSpeechEnabled: false,
+            narrationProvider: 'disabled',
+            narrationPlayback: 'off',
             excludedContent: [],
             maxNarrationWords: 120,
             sessionLengthMinutes: 45,
@@ -333,29 +429,7 @@ export function AdventurePlayScreen({
           </p>
           {storyBeat.speaker && <p className="adventure-speaker">{storyBeat.speaker}</p>}
           <p className="adventure-narration" aria-live="polite">{storyBeat.narration}</p>
-          {voiceEnabled && (
-            <div className="narration-voice-controls" aria-label="Narration playback controls">
-              {narrationState === 'speaking' && (
-                <button type="button" className="button button-secondary" onClick={() => {
-                  window.speechSynthesis.pause()
-                  setNarrationState('paused')
-                }}>Pause narration</button>
-              )}
-              {narrationState === 'paused' && (
-                <button type="button" className="button button-secondary" onClick={() => {
-                  window.speechSynthesis.resume()
-                  setNarrationState('speaking')
-                }}>Resume narration</button>
-              )}
-              {narrationState !== 'speaking' && narrationState !== 'paused' && (
-                <button type="button" className="button button-secondary" onClick={speakNarration}>Read narration aloud</button>
-              )}
-              {narrationState !== 'idle' && (
-                <button type="button" className="text-button" onClick={stopNarration}>Stop narration</button>
-              )}
-              {playbackMessage && <span role="status">{playbackMessage}</span>}
-            </div>
-          )}
+          {renderNarrationControls()}
           {storyBeat.npcDialogue?.map((line, index) => (
             <p className="adventure-speaker" key={`${line.npcName}-${index}`}>
               <strong>{line.npcName}:</strong> {line.text}

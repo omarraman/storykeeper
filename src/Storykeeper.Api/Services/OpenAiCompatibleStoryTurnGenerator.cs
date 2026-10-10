@@ -56,85 +56,103 @@ public sealed class OpenAiCompatibleStoryTurnGenerator(
                 "Story narration is not configured. Ask a grown-up to check the server's AI settings.");
         }
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", config.ApiKey.Trim());
         using var contextDocument = JsonDocument.Parse(input.ContextJson);
-        request.Content = new StringContent(JsonSerializer.Serialize(new
+        for (var attempt = 0; attempt < 2; attempt++)
         {
-            model = config.Model.Trim(),
-            temperature = 0.6,
-            max_tokens = 2400,
-            response_format = new { type = "text" },
-            messages = new[]
+            using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", config.ApiKey.Trim());
+            var requestBody = new Dictionary<string, object>
             {
-                new { role = "system", content = SystemPrompt },
-                new
+                ["model"] = config.Model.Trim(),
+                ["temperature"] = 0.6,
+                ["max_tokens"] = 2400,
+                ["response_format"] = new { type = "text" },
+                ["messages"] = new[]
                 {
-                    role = "user",
-                    content = JsonSerializer.Serialize(new
+                    new { role = "system", content = SystemPrompt },
+                    new
                     {
-                        action = input.Action,
-                        currentCampaignContext = contextDocument.RootElement
-                    }, ProviderJsonOptions)
+                        role = "user",
+                        content = JsonSerializer.Serialize(new
+                        {
+                            action = input.Action,
+                            currentCampaignContext = contextDocument.RootElement
+                        }, ProviderJsonOptions)
+                    }
+                }
+            };
+            if (attempt > 0)
+            {
+                requestBody["chat_template_kwargs"] = new { enable_thinking = false };
+            }
+
+            request.Content = new StringContent(JsonSerializer.Serialize(requestBody, ProviderJsonOptions),
+                Encoding.UTF8, "application/json");
+
+            HttpResponseMessage response;
+            try
+            {
+                response = await httpClient.SendAsync(request, cancellationToken);
+            }
+            catch (HttpRequestException exception)
+            {
+                throw new StoryTurnGenerationException(502,
+                    "The Storykeeper could not reach the story service. Please try again.", exception);
+            }
+            catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw new StoryTurnGenerationException(504,
+                    "The Storykeeper is taking a little longer than expected. Please try again.", exception);
+            }
+
+            using (response)
+            {
+                if (!response.IsSuccessStatusCode)
+                {
+                    logger.LogWarning("Story turn provider returned HTTP {StatusCode}.", response.StatusCode);
+                    throw new StoryTurnGenerationException(502,
+                        "The Storykeeper could not shape that response. Please try again.");
+                }
+
+                ProviderResponse? result;
+                try
+                {
+                    result = await response.Content.ReadFromJsonAsync<ProviderResponse>(ProviderJsonOptions, cancellationToken);
+                }
+                catch (JsonException exception)
+                {
+                    throw new StoryTurnGenerationException(502,
+                        "The Storykeeper received an unreadable response. Please try again.", exception);
+                }
+
+                var message = result?.Choices?.FirstOrDefault()?.Message;
+                if (string.IsNullOrWhiteSpace(message?.Content))
+                {
+                    if (attempt == 0 && !string.IsNullOrWhiteSpace(message?.ReasoningContent))
+                    {
+                        continue;
+                    }
+
+                    throw new StoryTurnGenerationException(502,
+                        "The Storykeeper received an empty response. Please try again.");
+                }
+
+                try
+                {
+                    return JsonSerializer.Deserialize<StoryTurnContent>(message.Content, TurnJsonOptions)
+                        ?? throw new StoryTurnGenerationException(502,
+                            "The Storykeeper could not shape that response. Please try again.");
+                }
+                catch (JsonException exception)
+                {
+                    throw new StoryTurnGenerationException(502,
+                        "The Storykeeper could not shape that response. Please try again.", exception);
                 }
             }
-        }, ProviderJsonOptions), Encoding.UTF8, "application/json");
-
-        HttpResponseMessage response;
-        try
-        {
-            response = await httpClient.SendAsync(request, cancellationToken);
-        }
-        catch (HttpRequestException exception)
-        {
-            throw new StoryTurnGenerationException(502,
-                "The Storykeeper could not reach the story service. Please try again.", exception);
-        }
-        catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
-        {
-            throw new StoryTurnGenerationException(504,
-                "The Storykeeper is taking a little longer than expected. Please try again.", exception);
         }
 
-        using (response)
-        {
-            if (!response.IsSuccessStatusCode)
-            {
-                logger.LogWarning("Story turn provider returned HTTP {StatusCode}.", response.StatusCode);
-                throw new StoryTurnGenerationException(502,
-                    "The Storykeeper could not shape that response. Please try again.");
-            }
-
-            ProviderResponse? result;
-            try
-            {
-                result = await response.Content.ReadFromJsonAsync<ProviderResponse>(ProviderJsonOptions, cancellationToken);
-            }
-            catch (JsonException exception)
-            {
-                throw new StoryTurnGenerationException(502,
-                    "The Storykeeper received an unreadable response. Please try again.", exception);
-            }
-
-            var content = result?.Choices?.FirstOrDefault()?.Message?.Content;
-            if (string.IsNullOrWhiteSpace(content))
-            {
-                throw new StoryTurnGenerationException(502,
-                    "The Storykeeper received an empty response. Please try again.");
-            }
-
-            try
-            {
-                return JsonSerializer.Deserialize<StoryTurnContent>(content, TurnJsonOptions)
-                    ?? throw new StoryTurnGenerationException(502,
-                        "The Storykeeper could not shape that response. Please try again.");
-            }
-            catch (JsonException exception)
-            {
-                throw new StoryTurnGenerationException(502,
-                    "The Storykeeper could not shape that response. Please try again.", exception);
-            }
-        }
+        throw new StoryTurnGenerationException(502,
+            "The Storykeeper received an empty response. Please try again.");
     }
 
     private static bool TryGetEndpoint(string? baseUrl, out Uri endpoint)
@@ -159,5 +177,7 @@ public sealed class OpenAiCompatibleStoryTurnGenerator(
 
     private sealed record ProviderResponse(IReadOnlyList<ProviderChoice>? Choices);
     private sealed record ProviderChoice(ProviderMessage? Message);
-    private sealed record ProviderMessage(string? Content);
+    private sealed record ProviderMessage(
+        string? Content,
+        [property: JsonPropertyName("reasoning_content")] string? ReasoningContent);
 }

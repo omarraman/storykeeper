@@ -16,16 +16,24 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
         (left, right) => left!.FearLevel == right!.FearLevel &&
                          left.CombatMode == right.CombatMode &&
                          left.VoiceEnabled == right.VoiceEnabled &&
+                         left.TextToSpeechEnabled == right.TextToSpeechEnabled &&
+                         left.NarrationProvider == right.NarrationProvider &&
+                         left.NarrationPlayback == right.NarrationPlayback &&
                          left.MaxNarrationWords == right.MaxNarrationWords &&
                          left.SessionLengthMinutes == right.SessionLengthMinutes &&
                          left.ExcludedContent.SequenceEqual(right.ExcludedContent),
         value => HashCode.Combine(
-            value!.FearLevel,
-            value.CombatMode,
-            value.VoiceEnabled,
-            value.MaxNarrationWords,
-            value.SessionLengthMinutes,
-            value.ExcludedContent.Aggregate(0, (hash, item) => HashCode.Combine(hash, item.GetHashCode()))),
+            HashCode.Combine(
+                value!.FearLevel,
+                value.CombatMode,
+                value.VoiceEnabled,
+                value.TextToSpeechEnabled),
+            HashCode.Combine(
+                value.NarrationProvider,
+                value.NarrationPlayback,
+                value.MaxNarrationWords,
+                value.SessionLengthMinutes,
+                value.ExcludedContent.Aggregate(0, (hash, item) => HashCode.Combine(hash, item.GetHashCode())))),
         value => CloneParentSafetySettings(value!));
     private static readonly JsonSerializerOptions SafetySettingsJsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -43,6 +51,7 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
     public DbSet<Npc> Npcs => Set<Npc>();
     public DbSet<Quest> Quests => Set<Quest>();
     public DbSet<Session> Sessions => Set<Session>();
+    public DbSet<StoryBeat> StoryBeats => Set<StoryBeat>();
     public DbSet<CheckResolution> CheckResolutions => Set<CheckResolution>();
     public DbSet<CampaignFact> CampaignFacts => Set<CampaignFact>();
     public DbSet<CampaignContinuityRevision> CampaignContinuityRevisions => Set<CampaignContinuityRevision>();
@@ -214,6 +223,17 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
             entity.HasIndex(session => new { session.CampaignId, session.SessionNumber }).IsUnique();
             entity.HasAlternateKey(session => new { session.CampaignId, session.Id });
         }, campaignNavigation: campaign => campaign.Sessions);
+        modelBuilder.Entity<StoryBeat>(entity =>
+        {
+            entity.HasKey(beat => beat.Id);
+            entity.Property(beat => beat.Narration).HasMaxLength(1200).IsRequired();
+            entity.HasIndex(beat => new { beat.CampaignId, beat.SessionId, beat.Id }).IsUnique();
+            entity.HasOne<Session>()
+                .WithMany()
+                .HasForeignKey(beat => new { beat.CampaignId, beat.SessionId })
+                .HasPrincipalKey(session => new { session.CampaignId, session.Id })
+                .OnDelete(DeleteBehavior.Cascade);
+        });
         ConfigureCampaignEntity<CheckResolution>(modelBuilder, entity =>
         {
             entity.Property(check => check.Strength).HasMaxLength(80);
@@ -306,6 +326,9 @@ public sealed class StorykeeperDbContext(DbContextOptions<StorykeeperDbContext> 
         FearLevel = value.FearLevel,
         CombatMode = value.CombatMode,
         VoiceEnabled = value.VoiceEnabled,
+        TextToSpeechEnabled = value.TextToSpeechEnabled,
+        NarrationProvider = value.NarrationProvider,
+        NarrationPlayback = value.NarrationPlayback,
         ExcludedContent = value.ExcludedContent.ToList(),
         MaxNarrationWords = value.MaxNarrationWords,
         SessionLengthMinutes = value.SessionLengthMinutes

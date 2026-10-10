@@ -23,6 +23,16 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0,
                 AutoReplenishment = true
             }));
+    options.AddPolicy("tts-audio", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 });
 
@@ -38,6 +48,28 @@ builder.Services.AddScoped<IGameRulesService, GameRulesService>();
 builder.Services.AddScoped<ICampaignBriefService, CampaignBriefService>();
 builder.Services.AddScoped<ICampaignContinuityService, CampaignContinuityService>();
 builder.Services.Configure<StorykeeperAiOptions>(builder.Configuration.GetSection("Storykeeper:Ai"));
+builder.Services.Configure<TextToSpeechOptions>(builder.Configuration.GetSection("TextToSpeech"));
+void ConfigureTtsHttpClient(IServiceProvider services, HttpClient client)
+{
+    var options = services.GetRequiredService<IOptions<TextToSpeechOptions>>().Value;
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds is >= 1 and <= 180
+        ? options.TimeoutSeconds
+        : 30);
+}
+builder.Services.AddHttpClient<PiperTextToSpeechProvider>(ConfigureTtsHttpClient);
+builder.Services.AddHttpClient<ElevenLabsTextToSpeechProvider>(ConfigureTtsHttpClient);
+builder.Services.AddScoped<ITextToSpeechProvider>(services =>
+{
+    var options = services.GetRequiredService<IOptions<TextToSpeechOptions>>().Value;
+    return options.Provider switch
+    {
+        TextToSpeechProviderKind.Piper => services.GetRequiredService<PiperTextToSpeechProvider>(),
+        TextToSpeechProviderKind.ElevenLabs => services.GetRequiredService<ElevenLabsTextToSpeechProvider>(),
+        _ => services.GetRequiredService<DisabledTextToSpeechProvider>()
+    };
+});
+builder.Services.AddSingleton<DisabledTextToSpeechProvider>();
+builder.Services.AddScoped<ITextToSpeechService, TextToSpeechService>();
 builder.Services.AddHttpClient<IAdventureDraftGenerator, OpenAiCompatibleAdventureDraftGenerator>((services, client) =>
 {
     var options = services.GetRequiredService<IOptions<StorykeeperAiOptions>>().Value;
@@ -67,6 +99,113 @@ await using (var scope = app.Services.CreateAsyncScope())
 }
 
 app.MapGet("/api/health", () => Results.Ok(new { status = "Healthy" }));
+app.MapGet("/api/text-to-speech/status", (IOptions<TextToSpeechOptions> options) =>
+{
+    var settings = options.Value;
+    var baseUrlConfigured = TextToSpeechEndpoint.TryCreate(
+        settings.BaseUrl,
+        settings.Provider == TextToSpeechProviderKind.Piper,
+        out _);
+    var providerConfigured = settings.Provider switch
+    {
+        TextToSpeechProviderKind.Piper => baseUrlConfigured &&
+            !string.IsNullOrWhiteSpace(settings.NarratorVoice),
+        TextToSpeechProviderKind.ElevenLabs => baseUrlConfigured &&
+            !string.IsNullOrWhiteSpace(settings.ApiKey) &&
+            !string.IsNullOrWhiteSpace(settings.Model) &&
+            !string.IsNullOrWhiteSpace(settings.NarratorVoice),
+        _ => false
+    };
+    return Results.Ok(new
+    {
+        enabled = settings.Enabled && providerConfigured,
+        configured = providerConfigured,
+        provider = settings.Provider.ToString()
+    });
+});
+
+app.MapGet("/api/campaigns/{campaignId:guid}/sessions/{sessionId:guid}/story-beats/{storyBeatId:guid}/audio", async (
+    Guid campaignId,
+    Guid sessionId,
+    Guid storyBeatId,
+    StorykeeperDbContext dbContext,
+    ITextToSpeechService textToSpeech,
+    IOptions<TextToSpeechOptions> serverTtsOptions,
+    CancellationToken cancellationToken) =>
+{
+    var storyBeat = await dbContext.StoryBeats.AsNoTracking()
+        .SingleOrDefaultAsync(beat =>
+            beat.CampaignId == campaignId &&
+            beat.SessionId == sessionId &&
+            beat.Id == storyBeatId,
+            cancellationToken);
+    if (storyBeat is null)
+    {
+        return Results.NotFound();
+    }
+
+    var campaign = await dbContext.Campaigns.AsNoTracking()
+        .Where(item => item.Id == campaignId)
+        .Select(item => new { item.Status, SafetySettings = item.Settings!.SafetySettings })
+        .SingleOrDefaultAsync(cancellationToken);
+    if (campaign is null || campaign.Status == CampaignStatus.Archived)
+    {
+        return Results.NotFound();
+    }
+
+    if (!campaign.SafetySettings.TextToSpeechEnabled ||
+        campaign.SafetySettings.NarrationProvider == TextToSpeechProviderKind.Disabled ||
+        campaign.SafetySettings.NarrationPlayback == NarrationPlaybackPreference.Off)
+    {
+        return Results.Json(
+            new TextToSpeechErrorResponse(
+                "unavailable",
+                "parent_disabled",
+                "Narrated playback is turned off in parent settings. The story text is still available.",
+                false),
+            statusCode: StatusCodes.Status403Forbidden);
+    }
+
+    if (campaign.SafetySettings.NarrationProvider != serverTtsOptions.Value.Provider)
+    {
+        return Results.Json(
+            new TextToSpeechErrorResponse(
+                "unavailable",
+                "provider_not_configured",
+                "The selected narration provider is not configured on the story server. The story text is still available.",
+                false),
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+
+    var result = await textToSpeech.SynthesizeAsync(storyBeat.Narration, cancellationToken);
+    if (result.Status != TextToSpeechResultStatus.Success)
+    {
+        var (statusCode, message, retryable) = result.Status switch
+        {
+            TextToSpeechResultStatus.Disabled => (
+                StatusCodes.Status503ServiceUnavailable,
+                "Narrated playback is not enabled on the story server. The story text is still available.",
+                false),
+            TextToSpeechResultStatus.TimedOut => (
+                StatusCodes.Status504GatewayTimeout,
+                "Narrated playback took too long. The story text is still available.",
+                true),
+            TextToSpeechResultStatus.Unavailable => (
+                StatusCodes.Status503ServiceUnavailable,
+                "Narrated playback is temporarily unavailable. The story text is still available.",
+                true),
+            _ => (
+                StatusCodes.Status502BadGateway,
+                "Narrated playback could not be prepared. The story text is still available.",
+                true)
+        };
+        return Results.Json(
+            new TextToSpeechErrorResponse("unavailable", result.ErrorCode ?? "unavailable", message, retryable),
+            statusCode: statusCode);
+    }
+
+    return Results.Stream(new MemoryStream(result.AudioBytes!), result.ContentType);
+}).RequireRateLimiting("tts-audio");
 
 var archiveJsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web)
 {

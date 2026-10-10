@@ -29,8 +29,8 @@ Current implementation focus:
   cached app shell for brief connection interruptions.
 - Tablet landscape adventure-play screen with suggested and free-text actions,
   physical-d20 entry, and server-backed AI narration for playable campaigns.
-- Parent-enabled, browser-managed voice dictation and narrated playback with
-  text-first fallbacks.
+- Parent-enabled server-side narrated playback of validated StoryBeats, with
+  text-first fallbacks; microphone input and speech-to-text are deferred.
 - Reusable campaign/domain model with SQLite persistence and campaign isolation.
 - Server-authoritative, child-friendly d20 checks with session hearts, sparkle
   tokens, and forward-progress outcomes.
@@ -56,13 +56,14 @@ Current implementation focus:
 
 | Document | Purpose | Status |
 |---|---|---|
-| [README.md](README.md) | Repository overview and local quick start | Planned |
-| [Development guide](docs/development.md) | Setup, run, test, configuration, and deployment guidance | Available |
+| [README.md](README.md) | Repository overview, local quick start, and source archive creation | Available |
+| [Development guide](docs/development.md) | Setup, run, test, configuration, deployment, and Perplexity source archives | Available |
 | [PWA installation and delivery](docs/pwa-delivery.md) | Android installation, app-shell caching, and production HTTPS delivery | Available |
 | [Architecture](docs/architecture.md) | Web PWA, API, persistence, and AI integration boundaries | Available |
 | [Domain model](docs/domain-model.md) | Campaigns, heroes, NPCs, facts, quests, sessions, and inventory | Available |
 | [Game rules](docs/game-rules.md) | Child-friendly d20 rules, hearts, sparkle tokens, and consequences | Available |
-| [Adventure play](docs/adventure-play.md) | Play screen, optional voice controls, session wrap-up, parent continuity controls, typed turn-client boundary, and authoritative roll integration | Available |
+| [Adventure play](docs/adventure-play.md) | Play screen, narrated playback controls, session wrap-up, parent continuity controls, typed turn-client boundary, and authoritative roll integration | Available |
+| [Text-to-speech](docs/text-to-speech.md) | Server-only providers, configuration, saved-StoryBeat audio API, caching, and Phase 2 boundary | Available |
 | [Storybook history and campaign export](docs/storybook-and-campaign-export.md) | Campaign storybook history, versioned JSON archive format, and safe restore behavior | Available |
 | [Campaign generation](docs/campaign-generation.md) | CampaignBrief wizard, validated generation, approval, activation, and bible versions | Available |
 | [Next playable adventures](docs/next-adventures.md) | Session-length preferences, continuity-aware episode plans, parent review, and quest activation | Available |

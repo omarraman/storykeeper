@@ -39,6 +39,20 @@ JSON shape server-side, which supports compatible servers that reject the
 as `local-dev` when authentication is disabled; the API still requires a
 non-empty key setting.
 
+## Optional narrated playback
+
+Narrated playback is disabled by default and does not add a development or
+test dependency on Piper or ElevenLabs. Set the server-side `TextToSpeech__*`
+variables documented in [.env.example](../.env.example) to enable it. For
+Docker Compose, use the corresponding `TEXT_TO_SPEECH_*` names in `.env`.
+Choose exactly one provider; `Piper` calls the configured local HTTP endpoint,
+while `ElevenLabs` calls its HTTPS API with `TextToSpeech__ApiKey`. The parent
+then selects Off, On demand, or Autoplay after a new story beat for each
+campaign. The audio cache defaults to `/data/tts-cache` in Compose; customize
+it with `TEXT_TO_SPEECH_CACHE_DIRECTORY`. Cache files are server data and are
+excluded from Git. See [Text-to-speech](text-to-speech.md) for exact provider
+payloads and the campaign-scoped audio API.
+
 For Docker Compose, set `STORYKEEPER_AI_BASE_URL`, `STORYKEEPER_AI_MODEL`,
 `STORYKEEPER_AI_API_KEY`, and optionally `STORYKEEPER_AI_TIMEOUT_SECONDS` in
 the untracked `.env` file. Generation remains unavailable if the provider
@@ -85,3 +99,26 @@ dotnet ef migrations add <MigrationName> --project src/Storykeeper.Api/Storykeep
 
 Commit generated migration files with the model change. Do not commit local
 SQLite databases.
+
+## Creating a Perplexity context archive
+
+`Storykeeper.Archiver` creates a ZIP containing the solution files, source,
+tests, documentation, and configuration needed to understand the codebase.
+Run it from the repository root to create `Storykeeper-Perplexity.zip` beside
+the repository:
+
+```sh
+dotnet run --project src/Storykeeper.Archiver/Storykeeper.Archiver.csproj
+```
+
+You can pass a source directory and an output ZIP path:
+
+```sh
+dotnet run --project src/Storykeeper.Archiver/Storykeeper.Archiver.csproj -- "C:\path\to\source" "C:\path\to\output.zip"
+```
+
+The archive preserves relative paths and skips Git and IDE metadata,
+dependencies, `bin`, `obj`, frontend build output, DLLs, other compiled
+binaries, local databases, and local environment files. `.env.example` is
+included. Output defaults to a ZIP beside the source directory; the output
+file itself is never added if an explicit output path is inside the source.

@@ -111,6 +111,21 @@
   margin: 0 0 18px;
 }
 
+.narration-voice-controls .button {
+  min-width: 86px;
+  min-height: 52px;
+  font-size: 1rem;
+}
+
+.narration-voice-controls .button:focus-visible {
+  outline: 3px solid #d5a76d;
+  outline-offset: 2px;
+}
+
+.narration-voice-controls audio {
+  display: none;
+}
+
 .narration-voice-controls > span {
   color: #68746a;
   font-size: 0.82rem;

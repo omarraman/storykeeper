@@ -277,19 +277,27 @@ public sealed class StoryTurnService(
                     Status = CampaignFactStatus.Proposed
                 }).ToArray();
             dbContext.CampaignFacts.AddRange(newFacts);
-            await dbContext.SaveChangesAsync(cancellationToken);
-            facts = facts.Concat(newFacts).OrderByDescending(fact => fact.Importance).Take(20).ToArray();
+                facts = facts.Concat(newFacts).OrderByDescending(fact => fact.Importance).Take(20).ToArray();
         }
 
+        var storyBeatId = Guid.NewGuid();
+        dbContext.StoryBeats.Add(new StoryBeat
+        {
+                Id = storyBeatId,
+                CampaignId = campaignId,
+                SessionId = session.Id,
+                Narration = content.Narration!
+        });
         if (session.ParentInstruction is not null)
         {
-            await dbContext.Sessions
+                await dbContext.Sessions
                 .Where(item => item.CampaignId == campaignId && item.Id == session.Id)
                 .ExecuteUpdateAsync(update => update.SetProperty(item => item.ParentInstruction, (string?)null),
                     cancellationToken);
         }
 
-        return StoryTurnResponse.ForStory(content, facts, currentQuest, heroes);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return StoryTurnResponse.ForStory(storyBeatId, content, facts, currentQuest, heroes);
     }
 
     private async Task<object?> LoadResolvedCheckAsync(

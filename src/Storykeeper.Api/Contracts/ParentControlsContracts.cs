@@ -32,6 +32,27 @@ public static class ParentControlsRequestValidator
             errors["combatMode"] = ["Choose a supported combat mode."];
         }
 
+        if (!Enum.IsDefined(settings.NarrationPlayback))
+        {
+            errors["narrationPlayback"] = ["Choose a supported narration playback preference."];
+        }
+
+        if (!Enum.IsDefined(settings.NarrationProvider))
+        {
+            errors["narrationProvider"] = ["Choose a supported narration provider."];
+        }
+
+        if (settings.TextToSpeechEnabled &&
+            (settings.NarrationProvider == TextToSpeechProviderKind.Disabled ||
+             settings.NarrationPlayback == NarrationPlaybackPreference.Off))
+        {
+            errors["textToSpeechEnabled"] = ["Choose a configured provider and playback preference to enable narration."];
+        }
+        else if (!settings.TextToSpeechEnabled && settings.NarrationPlayback != NarrationPlaybackPreference.Off)
+        {
+            errors["narrationPlayback"] = ["Choose Off when narrated playback is disabled."];
+        }
+
         if (settings.MaxNarrationWords is < 40 or > 150)
         {
             errors["maxNarrationWords"] = ["Narration length must be between 40 and 150 words."];

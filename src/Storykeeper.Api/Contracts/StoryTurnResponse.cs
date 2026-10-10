@@ -16,6 +16,7 @@ public sealed record StoryTurnResponse(
             request.Risky));
 
     public static StoryTurnResponse ForStory(
+        Guid storyBeatId,
         StoryTurnContent content,
         IReadOnlyList<CampaignFact> facts,
         Quest? quest,
@@ -23,7 +24,7 @@ public sealed record StoryTurnResponse(
         new(
             "story_beat",
             new StoryBeatResponse(
-                Guid.NewGuid().ToString("N"),
+                storyBeatId.ToString("N"),
                 content.Narration!,
                 content.Speaker,
                 content.NpcDialogue!.Select(dialogue =>

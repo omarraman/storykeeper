@@ -12,6 +12,16 @@ services:
       Storykeeper__Ai__ApiKey: ${STORYKEEPER_AI_API_KEY:-}
       Storykeeper__Ai__TimeoutSeconds: ${STORYKEEPER_AI_TIMEOUT_SECONDS:-60}
       Storykeeper__ParentPin: ${STORYKEEPER_PARENT_PIN:-}
+      TextToSpeech__Enabled: ${TEXT_TO_SPEECH_ENABLED:-false}
+      TextToSpeech__Provider: ${TEXT_TO_SPEECH_PROVIDER:-Disabled}
+      TextToSpeech__BaseUrl: ${TEXT_TO_SPEECH_BASE_URL:-}
+      TextToSpeech__ApiKey: ${TEXT_TO_SPEECH_API_KEY:-}
+      TextToSpeech__Model: ${TEXT_TO_SPEECH_MODEL:-}
+      TextToSpeech__NarratorVoice: ${TEXT_TO_SPEECH_NARRATOR_VOICE:-}
+      TextToSpeech__OutputFormat: ${TEXT_TO_SPEECH_OUTPUT_FORMAT:-mp3_44100_128}
+      TextToSpeech__TimeoutSeconds: ${TEXT_TO_SPEECH_TIMEOUT_SECONDS:-30}
+      TextToSpeech__CacheEnabled: ${TEXT_TO_SPEECH_CACHE_ENABLED:-true}
+      TextToSpeech__CacheDirectory: ${TEXT_TO_SPEECH_CACHE_DIRECTORY:-/data/tts-cache}
     ports:
       - "${API_PORT:-5080}:8080"
     volumes:

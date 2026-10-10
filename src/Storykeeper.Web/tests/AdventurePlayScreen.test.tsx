@@ -216,6 +216,9 @@ describe('AdventurePlayScreen', () => {
         fearLevel: 'low' as const,
         combatMode: 'avoid' as const,
         voiceEnabled: true,
+        textToSpeechEnabled: false,
+        narrationProvider: 'disabled' as const,
+        narrationPlayback: 'off' as const,
         excludedContent: [],
         maxNarrationWords: 120,
         sessionLengthMinutes: 45,
@@ -253,21 +256,29 @@ describe('AdventurePlayScreen', () => {
     expect(screen.getByText('A lantern floats across a sunny meadow.')).toBeTruthy()
   })
 
-  it('plays narration with pause and stop controls and interrupts it to enter a new idea', () => {
-    const synthesis = { speak: vi.fn(), cancel: vi.fn(), pause: vi.fn(), resume: vi.fn() }
-    class MockUtterance {
-      onend: (() => void) | null = null
-      onerror: (() => void) | null = null
-      constructor(readonly text: string) {}
-    }
-    vi.stubGlobal('speechSynthesis', synthesis)
-    vi.stubGlobal('SpeechSynthesisUtterance', MockUtterance)
+  it('keeps narration text visible and provides server-audio controls without autoplay on load', async () => {
+    const fetchMock = vi.fn(async () => new Response(new Blob(['audio bytes']), {
+      headers: { 'Content-Type': 'audio/mpeg' },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn(() => 'blob:story-audio'),
+      revokeObjectURL: vi.fn(),
+    })
+    const play = vi.fn(async () => undefined)
+    const pause = vi.fn()
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', { configurable: true, value: play })
+    Object.defineProperty(HTMLMediaElement.prototype, 'pause', { configurable: true, value: pause })
+    Object.defineProperty(HTMLMediaElement.prototype, 'load', { configurable: true, value: vi.fn() })
     const voiceCampaign = {
       ...campaign,
       safetySettings: {
         fearLevel: 'low' as const,
         combatMode: 'avoid' as const,
-        voiceEnabled: true,
+        voiceEnabled: false,
+        textToSpeechEnabled: true,
+        narrationProvider: 'piper' as const,
+        narrationPlayback: 'onDemand' as const,
         excludedContent: [],
         maxNarrationWords: 120,
         sessionLengthMinutes: 45,
@@ -277,25 +288,123 @@ describe('AdventurePlayScreen', () => {
       <AdventurePlayScreen
         campaign={voiceCampaign}
         sessionId="session-1"
-        client={createClient()}
+        client={createClient({
+          openTurn: vi.fn(() => ({
+            ...openingResponse,
+            storyBeat: { ...beat, id: '0123456789abcdef0123456789abcdef' },
+          })),
+        })}
         onCampaignChange={vi.fn()}
         onBack={vi.fn()}
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Read narration aloud' }))
-    expect(synthesis.speak).toHaveBeenCalledOnce()
+    expect(screen.getByText('A lantern floats across a sunny meadow.')).toBeTruthy()
+    expect(fetchMock).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Listen to narration' }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      '/api/campaigns/campaign-1/sessions/session-1/story-beats/0123456789abcdef0123456789abcdef/audio',
+      expect.any(Object),
+    ))
+    await waitFor(() => expect(play).toHaveBeenCalledOnce())
     fireEvent.click(screen.getByRole('button', { name: 'Pause narration' }))
-    expect(synthesis.pause).toHaveBeenCalledOnce()
-    fireEvent.click(screen.getByRole('button', { name: 'Resume narration' }))
-    expect(synthesis.resume).toHaveBeenCalledOnce()
+    expect(pause).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: 'Listen to narration' }))
+    await waitFor(() => expect(play).toHaveBeenCalledTimes(2))
+    fireEvent.click(screen.getByRole('button', { name: 'Replay narration' }))
+    await waitFor(() => expect(play).toHaveBeenCalledTimes(3))
+    fireEvent.click(screen.getByRole('button', { name: 'Mute narration' }))
+    expect(screen.getByRole('button', { name: 'Unmute narration' }).getAttribute('aria-pressed')).toBe('true')
     fireEvent.click(screen.getByRole('button', { name: 'Stop narration' }))
-    expect(synthesis.cancel).toHaveBeenCalled()
+    expect(pause.mock.calls.length).toBeGreaterThanOrEqual(2)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Read narration aloud' }))
     fireEvent.click(screen.getByRole('button', { name: 'We have another idea!' }))
-    expect(synthesis.cancel.mock.calls.length).toBeGreaterThanOrEqual(2)
     expect(screen.getByLabelText('Tell the Storykeeper your idea')).toBeTruthy()
+  })
+
+  it('autoplays only when a newly received story beat arrives', async () => {
+    const fetchMock = vi.fn(async () => new Response(new Blob(['audio bytes']), {
+      headers: { 'Content-Type': 'audio/mpeg' },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:story-audio'), revokeObjectURL: vi.fn() })
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', { configurable: true, value: vi.fn(async () => undefined) })
+    Object.defineProperty(HTMLMediaElement.prototype, 'pause', { configurable: true, value: vi.fn() })
+    Object.defineProperty(HTMLMediaElement.prototype, 'load', { configurable: true, value: vi.fn() })
+    const client = createClient({
+      submitAction: vi.fn(async () => ({
+        type: 'story_beat',
+        storyBeat: { ...beat, id: 'abcdef0123456789abcdef0123456789', narration: 'A new path appears.' },
+        state,
+      })),
+    })
+    const narratedCampaign = {
+      ...campaign,
+      safetySettings: {
+        fearLevel: 'low' as const,
+        combatMode: 'avoid' as const,
+        voiceEnabled: false,
+        textToSpeechEnabled: true,
+        narrationProvider: 'piper' as const,
+        narrationPlayback: 'autoplayAfterNewStoryBeat' as const,
+        excludedContent: [],
+        maxNarrationWords: 120,
+        sessionLengthMinutes: 45,
+      },
+    }
+    render(
+      <AdventurePlayScreen
+        campaign={narratedCampaign}
+        sessionId="session-1"
+        client={client}
+        onCampaignChange={vi.fn()}
+        onBack={vi.fn()}
+      />,
+    )
+    expect(fetchMock).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Follow it' }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce())
+    expect(screen.getByText('A new path appears.')).toBeTruthy()
+  })
+
+  it('falls back to visible text when the server cannot provide audio', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      type: 'unavailable',
+      code: 'disabled',
+      message: 'Narrated playback is not enabled on the story server.',
+      retryable: false,
+    }, { status: 503 })))
+    const narratedCampaign = {
+      ...campaign,
+      safetySettings: {
+        fearLevel: 'low' as const,
+        combatMode: 'avoid' as const,
+        voiceEnabled: false,
+        textToSpeechEnabled: true,
+        narrationProvider: 'piper' as const,
+        narrationPlayback: 'onDemand' as const,
+        excludedContent: [],
+        maxNarrationWords: 120,
+        sessionLengthMinutes: 45,
+      },
+    }
+    render(
+      <AdventurePlayScreen
+        campaign={narratedCampaign}
+        sessionId="session-1"
+        client={createClient({
+          openTurn: vi.fn(() => ({
+            ...openingResponse,
+            storyBeat: { ...beat, id: '0123456789abcdef0123456789abcdef' },
+          })),
+        })}
+        onCampaignChange={vi.fn()}
+        onBack={vi.fn()}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Listen to narration' }))
+    expect(await screen.findByText(/not enabled on the story server/)).toBeTruthy()
+    expect(screen.getByText('A lantern floats across a sunny meadow.')).toBeTruthy()
   })
 
   describe('DemoAdventureTurnClient', () => {

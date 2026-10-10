@@ -29,13 +29,17 @@ Fright is either `None` or `Low`; combat is `Avoid`, `Silly`, or
 against generated text; adults should still review generated drafts and turns.
 Session length is a pacing target, not an automatic timer.
 
-Voice input and narrated playback share a campaign setting that defaults to
-disabled. Only a parent who has unlocked the PIN-gated controls can enable or
-disable both features. Voice uses browser-provided speech recognition and
-speech synthesis rather than Storykeeper provider credentials; microphone
-permission is controlled by the browser, and some browsers may process
-recognition through their own speech service. Children can continue using text
-and tap controls if voice is disabled, unavailable, or denied.
+Narrated playback has an enable flag, a provider choice, and a campaign
+preference with three values: `Off` (the default), `On demand`, and
+`Autoplay after a new story beat`. Only a parent with unlocked PIN-gated
+controls can change them. Provider choices are restricted to the one
+server-configured provider; the provider status is shown without exposing
+credentials.
+Children can continue using visible narration, text actions, tap choices, and
+physical dice if playback is off, unavailable, or denied by the browser.
+
+Microphone capture and speech-to-text are not part of the Phase 1 narrated
+playback implementation and are deferred to Phase 2.
 
 ## Parent PIN
 

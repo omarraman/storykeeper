@@ -784,6 +784,34 @@ namespace Storykeeper.Api.Data.Migrations
                     b.ToTable("Sessions");
                 });
 
+            modelBuilder.Entity("Storykeeper.Api.Domain.StoryBeat", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("CampaignId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Narration")
+                        .IsRequired()
+                        .HasMaxLength(1200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CampaignId", "SessionId", "Id")
+                        .IsUnique();
+
+                    b.ToTable("StoryBeats");
+                });
+
             modelBuilder.Entity("Storykeeper.Api.Domain.AdventureDraft", b =>
                 {
                     b.HasOne("Storykeeper.Api.Domain.Campaign", null)
@@ -991,6 +1019,16 @@ namespace Storykeeper.Api.Data.Migrations
                     b.HasOne("Storykeeper.Api.Domain.Campaign", null)
                         .WithMany("Sessions")
                         .HasForeignKey("CampaignId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Storykeeper.Api.Domain.StoryBeat", b =>
+                {
+                    b.HasOne("Storykeeper.Api.Domain.Session", null)
+                        .WithMany()
+                        .HasForeignKey("CampaignId", "SessionId")
+                        .HasPrincipalKey("CampaignId", "Id")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

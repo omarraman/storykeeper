@@ -94,6 +94,20 @@ curl --fail http://localhost:5080/api/health
 The response should be `{"status":"Healthy"}`. The Vite development server
 serves the web app and proxies its health request to the API.
 
+## Create a source archive
+
+Create a ZIP of the meaningful solution files for sharing with tools such as
+Perplexity:
+
+```sh
+dotnet run --project src/Storykeeper.Archiver/Storykeeper.Archiver.csproj
+```
+
+The archive is created beside the repository. Generated build output,
+dependencies, compiled binaries, local databases, and local environment files
+are omitted; `.env.example` and the source directory structure are included.
+See [Development](docs/development.md) for custom source and output paths.
+
 ## Configuration and secrets
 
 Configuration uses environment variables. ASP.NET Core's standard environment
@@ -109,3 +123,14 @@ Campaign generation and live story narration use server-side
 `Storykeeper__Ai__ApiKey` settings; the key is never sent to the browser.
 Without them, other campaign features remain available while AI features
 return a safe configuration error.
+
+Optional narrated playback is configured only on the API server with the
+`TextToSpeech__*` settings shown in `.env.example`. It is disabled by default;
+choose `Piper` or `ElevenLabs` explicitly and supply that provider's server
+configuration before enabling it. Keep `TextToSpeech__ApiKey` in an
+untracked `.env` file or deployment secret manager. The browser receives audio
+bytes only, never provider credentials. Parent settings independently choose
+Off, On demand, or Autoplay after a new story beat. See
+[Text-to-speech](docs/text-to-speech.md) for provider endpoint, format, cache,
+and security details. Microphone input and speech-to-text are deferred to
+Phase 2.

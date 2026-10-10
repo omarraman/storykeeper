@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { request } from '../api/request'
-import type { ParentSafetySettings } from './contracts'
+import type { NarrationProvider, ParentSafetySettings } from './contracts'
 import './ParentControlsPanel.css'
 export type { ParentSafetySettings } from './contracts'
 
@@ -31,8 +31,38 @@ export function ParentControlsPanel({
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [paused, setPaused] = useState(isPaused)
+  const [ttsProviderStatus, setTtsProviderStatus] = useState('Checking server configuration…')
+  const [ttsServerInfo, setTtsServerInfo] = useState({
+    configured: false,
+    provider: 'disabled' as NarrationProvider,
+  })
 
   useEffect(() => setPaused(isPaused), [isPaused])
+
+  useEffect(() => {
+    if (!unlocked) return
+    let current = true
+    void request<{ enabled: boolean; configured: boolean; provider: string }>('/api/text-to-speech/status')
+      .then((status) => {
+        if (current) {
+          const provider: NarrationProvider = status.provider === 'Piper'
+            ? 'piper'
+            : status.provider === 'ElevenLabs'
+              ? 'elevenLabs'
+              : 'disabled'
+          setTtsServerInfo({ configured: status.configured, provider })
+          setTtsProviderStatus(status.enabled
+            ? `${status.provider} is configured`
+            : status.configured
+              ? `${status.provider} is configured but disabled on the server`
+              : `${status.provider} is not available`)
+        }
+      })
+      .catch(() => {
+        if (current) setTtsProviderStatus('Server provider status is unavailable')
+      })
+    return () => { current = false }
+  }, [unlocked])
 
   const parentHeaders = { 'X-Parent-Pin': pin }
 
@@ -165,7 +195,81 @@ export function ParentControlsPanel({
                     <input type="number" min={15} max={180} value={form.sessionLengthMinutes}
                       onChange={(event) => setForm({ ...form, sessionLengthMinutes: Number(event.target.value) })} />
                   </label>
+                  <label>
+                    Narration provider
+                    <select
+                      value={form.narrationProvider}
+                      onChange={(event) => {
+                        const narrationProvider = event.target.value as NarrationProvider
+                        const enabled = narrationProvider !== 'disabled'
+                        setForm({
+                          ...form,
+                          narrationProvider,
+                          textToSpeechEnabled: enabled,
+                          narrationPlayback: enabled
+                            ? form.narrationPlayback === 'off' ? 'onDemand' : form.narrationPlayback
+                            : 'off',
+                        })
+                      }}
+                    >
+                      <option value="disabled">Disabled</option>
+                      {ttsServerInfo.configured && ttsServerInfo.provider !== 'disabled' && (
+                        <option value={ttsServerInfo.provider}>
+                          {ttsServerInfo.provider === 'elevenLabs' ? 'ElevenLabs' : 'Piper'}
+                        </option>
+                      )}
+                    </select>
+                  </label>
+                  <label>
+                    Narrated playback
+                    <select
+                      value={form.narrationPlayback}
+                      onChange={(event) => {
+                        const narrationPlayback = event.target.value as ParentSafetySettings['narrationPlayback']
+                        const narrationProvider = narrationPlayback !== 'off' && form.narrationProvider === 'disabled'
+                          ? ttsServerInfo.provider
+                          : form.narrationProvider
+                        setForm({
+                          ...form,
+                          narrationPlayback,
+                          narrationProvider,
+                          textToSpeechEnabled: narrationPlayback !== 'off' &&
+                            ttsServerInfo.configured && narrationProvider !== 'disabled',
+                        })
+                      }}
+                    >
+                      <option value="off">Off</option>
+                      <option value="onDemand" disabled={!ttsServerInfo.configured}>On demand</option>
+                      <option value="autoplayAfterNewStoryBeat" disabled={!ttsServerInfo.configured}>
+                        Autoplay after a new story beat
+                      </option>
+                    </select>
+                  </label>
                 </div>
+                <label className="parent-voice-setting">
+                  <input
+                    type="checkbox"
+                    checked={form.textToSpeechEnabled}
+                    disabled={!ttsServerInfo.configured}
+                    onChange={(event) => setForm({
+                      ...form,
+                      textToSpeechEnabled: event.target.checked,
+                      narrationProvider: event.target.checked
+                        ? form.narrationProvider === 'disabled' ? ttsServerInfo.provider : form.narrationProvider
+                        : form.narrationProvider,
+                      narrationPlayback: event.target.checked
+                        ? form.narrationPlayback === 'off' ? 'onDemand' : form.narrationPlayback
+                        : 'off',
+                    })}
+                  />
+                  <span>
+                    <strong>Enable narrated playback</strong>
+                    <span>Server provider: {ttsProviderStatus}. Keys never leave the server.</span>
+                  </span>
+                </label>
+                <p className="parent-controls-hint">
+                  Provider choices are limited to the server-configured provider; local Piper never falls back to cloud speech.
+                </p>
                 <label className="parent-voice-setting">
                   <input
                     type="checkbox"
@@ -173,8 +277,8 @@ export function ParentControlsPanel({
                     onChange={(event) => setForm({ ...form, voiceEnabled: event.target.checked })}
                   />
                   <span>
-                    <strong>Allow voice input and spoken narration</strong>
-                    <span>Off by default. The browser may ask for microphone permission and may use its own speech service.</span>
+                    <strong>Allow browser voice input</strong>
+                    <span>Off by default. Browser dictation may use its own speech service.</span>
                   </span>
                 </label>
                 <label htmlFor={`excluded-content-${campaignId}`}>Topics or creatures to exclude <span>(one per line, up to 20)</span></label>

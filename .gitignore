@@ -11,6 +11,7 @@ node_modules/
 **/dist/
 **/coverage/
 storykeeper.db*
+**/tts-cache/
 
 # IDE and OS files
 .idea/

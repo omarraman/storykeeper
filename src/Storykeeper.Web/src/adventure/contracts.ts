@@ -49,11 +49,16 @@ export interface QuestSummary {
 export type AdventureArcType = 'standalone' | 'seasonArc'
 export type FearLevel = 'none' | 'low'
 export type CombatMode = 'avoid' | 'silly' | 'storyOnly'
+export type NarrationPlaybackPreference = 'off' | 'onDemand' | 'autoplayAfterNewStoryBeat'
+export type NarrationProvider = 'disabled' | 'piper' | 'elevenLabs'
 
 export interface ParentSafetySettings {
   fearLevel: FearLevel
   combatMode: CombatMode
   voiceEnabled: boolean
+  textToSpeechEnabled: boolean
+  narrationProvider: NarrationProvider
+  narrationPlayback: NarrationPlaybackPreference
   excludedContent: string[]
   maxNarrationWords: number
   sessionLengthMinutes: number

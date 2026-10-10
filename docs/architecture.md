@@ -84,12 +84,21 @@ Parent writes and live redirects require the API-configured
 browser. A session pause is saved server-side and blocks both narration and
 check resolution.
 
-The campaign's parent safety settings also store an opt-in voice flag, false
-by default. The PWA uses the browser's secure-context speech-recognition and
-speech-synthesis APIs; audio is not sent to Storykeeper's API, and no provider
-credential or speech-service key is provided to the browser. Browser support,
-permission, and any browser-vendor speech processing remain outside the server
-boundary. Voice can be disabled by a parent through the PIN-gated settings.
+Campaign parent settings store a narration playback preference, Off by default.
+The API saves the normalized narration of each successfully validated
+StoryBeat under its campaign and session before returning the beat ID. The
+campaign-scoped audio route accepts only that saved ID; it never accepts
+browser-supplied narration text. Server-side TTS providers synthesize the
+saved text, and the browser receives audio bytes without provider credentials.
+See [Text-to-speech](text-to-speech.md) for provider selection, cache, and
+failure behavior. Existing browser microphone/dictation behavior is separate
+from this server-side playback path; microphone capture and speech-to-text
+remain deferred from this Phase 1 change.
+
+TTS uses typed server options under `TextToSpeech`, defaults to the disabled
+provider, and selects one explicitly configured provider without fallback.
+Generated audio is cached under a server-configured, Git-ignored directory;
+in Compose the cache shares the API data volume.
 
 ## Storage configuration
 

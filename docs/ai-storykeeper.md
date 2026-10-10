@@ -25,7 +25,10 @@ content under a stable child-safety narrator prompt.
 
 The API requests up to 2,400 completion tokens in text mode, then parses
 `message.content` as strict typed JSON with no unknown properties. Reasoning
-channels are not used as story output. A response is either `roll_required`
+channels are never used as story output. If a provider returns reasoning but
+no user-facing content, the API retries once with llama.cpp's
+`chat_template_kwargs.enable_thinking=false`; it still rejects the response
+if the retry has no content. A response is either `roll_required`
 with a server-validated difficulty, optional listed
 hero strength, prompt, and risk flag, or `story_beat` with narration, optional
 speaker and NPC dialogue, up to four suggested choices, and current campaign

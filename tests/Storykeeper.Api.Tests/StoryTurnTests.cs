@@ -66,6 +66,11 @@ public sealed class StoryTurnTests
             currentQuest.GetProperty("adventurePlan").GetProperty("title").GetString());
         Assert.Equal(CampaignFactStatus.Proposed,
             (await database.Context.CampaignFacts.SingleAsync()).Status);
+        var savedStoryBeat = await database.Context.StoryBeats.SingleAsync();
+        Assert.Equal(result.StoryBeat!.Id, savedStoryBeat.Id.ToString("N"));
+        Assert.Equal(result.StoryBeat.Narration, savedStoryBeat.Narration);
+        Assert.Equal(campaign.Campaign.Id, savedStoryBeat.CampaignId);
+        Assert.Equal(campaign.Session.Id, savedStoryBeat.SessionId);
         Assert.Equal(campaign.Session.Id,
             (await database.Context.CampaignFacts.SingleAsync()).SourceSessionId);
         Assert.Empty(await database.Context.CampaignFacts.Where(fact => fact.CampaignId == otherCampaign.Campaign.Id).ToArrayAsync());
@@ -140,6 +145,7 @@ public sealed class StoryTurnTests
         Assert.Equal(502, exception.StatusCode);
         Assert.DoesNotContain("villain", exception.SafeMessage, StringComparison.OrdinalIgnoreCase);
         Assert.Empty(await database.Context.CampaignFacts.ToArrayAsync());
+        Assert.Empty(await database.Context.StoryBeats.ToArrayAsync());
     }
 
     [Fact]
@@ -231,6 +237,57 @@ public sealed class StoryTurnTests
 
         Assert.Equal(502, exception.StatusCode);
         Assert.DoesNotContain(privateReasoning, exception.SafeMessage, StringComparison.Ordinal);
+        Assert.Equal(2, handler.RequestBodies.Count);
+        using var retryRequest = JsonDocument.Parse(handler.RequestBodies[1]);
+        Assert.False(retryRequest.RootElement.GetProperty("chat_template_kwargs")
+            .GetProperty("enable_thinking").GetBoolean());
+    }
+
+    [Fact]
+    public async Task ProviderRetriesReasoningOnlyResponseWithThinkingDisabled()
+    {
+        const string narration = "The lantern reveals a tiny trail of silver leaves.";
+        const string storyBeat =
+            """{"narration":"The lantern reveals a tiny trail of silver leaves.","speaker":null,"npcDialogue":[],"rollRequest":null,"choices":[],"proposedFacts":[]}""";
+        var responses = new Queue<HttpResponseMessage>(
+        [
+            new(HttpStatusCode.OK)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(new
+                {
+                    choices = new[]
+                    {
+                        new { message = new { content = "", reasoning_content = "开支" }, finish_reason = "stop" }
+                    }
+                }))
+            },
+            new(HttpStatusCode.OK)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(new
+                {
+                    choices = new[] { new { message = new { content = storyBeat } } }
+                }))
+            }
+        ]);
+        var handler = new StubHandler(_ => responses.Dequeue());
+        using var client = new HttpClient(handler);
+        var generator = new OpenAiCompatibleStoryTurnGenerator(
+            client,
+            Options.Create(new StorykeeperAiOptions
+            {
+                BaseUrl = "https://example.test/v1",
+                Model = "family-safe-model",
+                ApiKey = "server-only-test-key"
+            }),
+            NullLogger<OpenAiCompatibleStoryTurnGenerator>.Instance);
+
+        var result = await generator.GenerateAsync(new StoryTurnGenerationInput("Look around for clues", "{}"));
+
+        Assert.Equal(narration, result.Narration);
+        Assert.Equal(2, handler.RequestBodies.Count);
+        using var retryRequest = JsonDocument.Parse(handler.RequestBodies[1]);
+        Assert.False(retryRequest.RootElement.GetProperty("chat_template_kwargs")
+            .GetProperty("enable_thinking").GetBoolean());
     }
 
     private static StoryTurnContent StoryContent(
@@ -305,6 +362,7 @@ public sealed class StoryTurnTests
         public Uri? RequestUri { get; private set; }
         public string? Authorization { get; private set; }
         public string? RequestBody { get; private set; }
+        public List<string> RequestBodies { get; } = [];
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
@@ -313,6 +371,7 @@ public sealed class StoryTurnTests
             RequestUri = request.RequestUri;
             Authorization = request.Headers.Authorization?.ToString();
             RequestBody = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
+            RequestBodies.Add(RequestBody ?? string.Empty);
             return respond(request);
         }
     }

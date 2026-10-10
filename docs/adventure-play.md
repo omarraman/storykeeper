@@ -70,24 +70,32 @@ selected by default; when there is only one hero, the screen says it is already
 selected. In empty-world preview mode, the card's “Demo hero” tag is only a
 status label, not a separate preview action.
 
-## Optional voice controls
+## Optional narrated playback
 
-Voice input and narrated playback are enabled together by a parent in the
-PIN-gated campaign settings; the setting is off by default and is saved with the
-campaign. While entering a free-text action, a child can press and hold the
-microphone button to dictate. Recognition stops on release, and the transcript
-is placed in the editable text box for the child to review and submit. The
-browser handles its speech-recognition session while the button is held; some
-browsers may use their own speech service. The app does not upload audio to the
-Storykeeper API or expose provider credentials. Microphone access requires a
-secure browser context and may require permission.
+The parent chooses Off, On demand, or Autoplay after a newly received story
+beat in the PIN-gated campaign settings; Off is the default. The scene always
+keeps the validated narration visible, and typed/tap actions and physical d20
+entry remain unchanged. Playback uses large Listen, Pause, Stop, Replay, and
+Mute controls. It never autoplays on initial page load; autoplay applies only
+when a new server StoryBeat replaces the current one.
 
-When enabled, the child can also ask the browser to read the visible narration
-aloud, pause or resume it, or stop it. Starting another idea cancels playback.
-Narration text and typed/tap actions remain available at all times. Unsupported
-browsers, denied permission, and recognition or playback errors give a
-text-first way to continue; voice transcripts and playback are not saved as
-campaign history.
+Listen requests audio by the current campaign, session, and server-issued
+StoryBeat ID. Only normalized narration already validated and saved by the API
+can be synthesized. The opening scene is assembled client-side from approved
+campaign data, not saved as an AI StoryBeat, so it remains text-only. Preview
+beats also remain text-only. Provider errors, unsupported audio playback, and
+network failures announce a recoverable message and leave the narration
+available to read. Starting a new action, replacing a beat, or leaving the
+screen stops existing playback.
+
+The API is configured with a single explicit server provider (Piper or
+ElevenLabs); no provider key reaches the browser and there is no automatic
+local-to-cloud fallback. Parents can choose the playback preference but cannot
+override server provider configuration. See [Text-to-speech](text-to-speech.md)
+for configuration, endpoint, and cache behavior.
+
+Microphone capture and speech-to-text are deferred to Phase 2. The existing
+browser dictation code is not changed by this narrated-playback phase.
 
 ## Resilience and accessibility
 

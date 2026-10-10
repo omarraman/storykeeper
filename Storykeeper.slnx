@@ -1,6 +1,8 @@
 <Solution>
   <Folder Name="/src/" />
+  <Project Path="src/Storykeeper.Archiver/Storykeeper.Archiver.csproj" />
   <Folder Name="/tests/">
+    <Project Path="tests/Storykeeper.Archiver.Tests/Storykeeper.Archiver.Tests.csproj" />
     <Project Path="tests/Storykeeper.Api.Tests/Storykeeper.Api.Tests.csproj" />
   </Folder>
   <Project Path="src/Storykeeper.Api/Storykeeper.Api.csproj" />

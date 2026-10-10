@@ -53,6 +53,26 @@ public sealed class ParentControlsTests
     }
 
     [Fact]
+    public void NarratedPlaybackIsOffByDefaultAndOnlyAcceptsSupportedPreferences()
+    {
+        Assert.Equal(NarrationPlaybackPreference.Off, ParentSafetySettings.Defaults.NarrationPlayback);
+
+        var settings = ParentSafetySettings.Defaults with
+        {
+            TextToSpeechEnabled = true,
+            NarrationProvider = TextToSpeechProviderKind.Piper,
+            NarrationPlayback = NarrationPlaybackPreference.AutoplayAfterNewStoryBeat
+        };
+        Assert.Empty(ParentControlsRequestValidator.Validate(settings));
+
+        settings = settings with { NarrationPlayback = (NarrationPlaybackPreference)99 };
+        Assert.Contains("narrationPlayback", ParentControlsRequestValidator.Validate(settings).Keys);
+
+        settings = settings with { NarrationProvider = (TextToSpeechProviderKind)99 };
+        Assert.Contains("narrationProvider", ParentControlsRequestValidator.Validate(settings).Keys);
+    }
+
+    [Fact]
     public void LiveNarrationEnforcesParentWordLimitAndExcludedContent()
     {
         var text = string.Join(' ', Enumerable.Repeat("gentle", 41)) + " map.";
