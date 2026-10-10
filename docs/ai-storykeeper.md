@@ -119,9 +119,28 @@ demo adapter and never save preview actions or state.
 
 The turn generator reuses the server-only
 `Storykeeper__Ai__BaseUrl`, `Storykeeper__Ai__Model`,
-`Storykeeper__Ai__ApiKey`, `Storykeeper__Ai__TimeoutSeconds`,
+`Storykeeper__Ai__ApiKey`, optional `Storykeeper__Ai__Temperature`,
+`Storykeeper__Ai__TimeoutSeconds`,
 `Storykeeper__Ai__RecentTurnLimit`, and
 `Storykeeper__Ai__RecentTurnCharacterBudget` settings documented in the
 [development guide](development.md). Only HTTPS provider URLs are accepted
 except loopback development endpoints. The browser never receives the API
-key.
+key. All three generators use the OpenAI-compatible `/chat/completions`
+integration; they do not use Anthropic's native `/v1/messages` API.
+Temperature is omitted when unset and is always omitted for Anthropic API
+hosts. It remains configurable for LM Studio and other compatible endpoints.
+Although Anthropic documents `response_format` as ignored, the configured
+`/chat/completions` endpoint returned HTTP 400 for this integration's
+`{"type":"text"}` hint and required `json_schema`. Since the prompts already
+request JSON and the server strictly validates it, omit `response_format` for
+Anthropic rather than sending a schema-less hint. Compatible local providers
+retain the text-mode hint. The story-turn retry's
+`chat_template_kwargs.enable_thinking` field is sent only to loopback
+development endpoints. Anthropic describes its OpenAI compatibility layer as
+primarily for testing and model comparison, not as a complete substitute for
+the native API; this integration does not claim full provider compatibility.
+
+On provider errors, development logs include at most 400 sanitized characters
+of the provider's structured error message and a bounded request ID when
+available. They do not log API credentials or request bodies; player-facing
+errors remain generic and safe.

@@ -181,7 +181,7 @@ public sealed class CampaignDraftTests
             client,
             Options.Create(new StorykeeperAiOptions
             {
-                BaseUrl = "https://example.test/v1",
+                BaseUrl = "https://api.anthropic.com/v1",
                 Model = "family-safe-model",
                 ApiKey = "server-only-test-key"
             }),
@@ -197,15 +197,15 @@ public sealed class CampaignDraftTests
 
         Assert.Equal(expected.Title, content.Title);
         Assert.Equal(3, content.Npcs!.Count);
-        Assert.Equal("https://example.test/v1/chat/completions", handler.RequestUri!.AbsoluteUri);
+        Assert.Equal("https://api.anthropic.com/v1/chat/completions", handler.RequestUri!.AbsoluteUri);
         using var requestDocument = JsonDocument.Parse(handler.RequestBody!);
+        Assert.False(requestDocument.RootElement.TryGetProperty("temperature", out _));
+        Assert.False(requestDocument.RootElement.TryGetProperty("response_format", out _));
         var messages = requestDocument.RootElement.GetProperty("messages").EnumerateArray().ToArray();
         Assert.Equal("system", messages[0].GetProperty("role").GetString());
         using var input = JsonDocument.Parse(messages[1].GetProperty("content").GetString()!);
         Assert.Equal("A short seed.", input.RootElement.GetProperty("storyIdea").GetString());
         Assert.Equal(guide, input.RootElement.GetProperty("authoredGuide").GetString());
-        Assert.Equal("text",
-            requestDocument.RootElement.GetProperty("response_format").GetProperty("type").GetString());
         Assert.Equal("Bearer server-only-test-key", handler.Authorization);
     }
 

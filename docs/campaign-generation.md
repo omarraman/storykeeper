@@ -114,5 +114,10 @@ Configure generation on the API server with `Storykeeper__Ai__BaseUrl`,
 provider's API root (for example, ending in `/v1`); only HTTPS is accepted
 except for loopback development endpoints. `Storykeeper__Ai__TimeoutSeconds`
 sets a 10-180 second request timeout. The key is never returned to the browser.
+The optional `Storykeeper__Ai__Temperature` is omitted when unset and is
+omitted for Anthropic API hosts, including Claude 4.7 and later. It can be set
+for LM Studio or another OpenAI-compatible provider. Campaign, adventure, and
+story-turn generation use the OpenAI-compatible `/chat/completions` endpoint;
+they do not switch to Anthropic's native `/v1/messages` API.
 Without these settings, brief saving and the rest of the app work normally,
 but requesting generation returns a configuration error.

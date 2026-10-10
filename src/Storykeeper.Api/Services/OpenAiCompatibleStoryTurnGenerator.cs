@@ -68,9 +68,7 @@ public sealed class OpenAiCompatibleStoryTurnGenerator(
             var requestBody = new Dictionary<string, object>
             {
                 ["model"] = config.Model.Trim(),
-                ["temperature"] = 0.6,
                 ["max_tokens"] = 2400,
-                ["response_format"] = new { type = "text" },
                 ["messages"] = new[]
                 {
                     new { role = "system", content = SystemPrompt },
@@ -85,9 +83,18 @@ public sealed class OpenAiCompatibleStoryTurnGenerator(
                     }
                 }
             };
-            if (attempt > 0)
+            if (OpenAiCompatibleProviderDiagnostics.ShouldIncludeResponseFormat(endpoint))
+            {
+                requestBody["response_format"] = new { type = "text" };
+            }
+
+            if (attempt > 0 && OpenAiCompatibleProviderDiagnostics.IsLoopbackEndpoint(endpoint))
             {
                 requestBody["chat_template_kwargs"] = new { enable_thinking = false };
+            }
+            if (OpenAiCompatibleProviderDiagnostics.ShouldIncludeTemperature(endpoint, config.Temperature))
+            {
+                requestBody["temperature"] = config.Temperature!.Value;
             }
 
             request.Content = new StringContent(JsonSerializer.Serialize(requestBody, ProviderJsonOptions),
@@ -113,7 +120,13 @@ public sealed class OpenAiCompatibleStoryTurnGenerator(
             {
                 if (!response.IsSuccessStatusCode)
                 {
-                    logger.LogWarning("Story turn provider returned HTTP {StatusCode}.", response.StatusCode);
+                    var diagnostic = await OpenAiCompatibleProviderDiagnostics.ReadAsync(
+                        response, config.ApiKey, cancellationToken);
+                    logger.LogWarning(
+                        "Story turn provider returned HTTP {StatusCode}. Provider error: {ProviderError}. Request ID: {RequestId}.",
+                        response.StatusCode,
+                        diagnostic.Message,
+                        diagnostic.RequestId);
                     throw new StoryTurnGenerationException(502,
                         "The Storykeeper could not shape that response. Please try again.");
                 }

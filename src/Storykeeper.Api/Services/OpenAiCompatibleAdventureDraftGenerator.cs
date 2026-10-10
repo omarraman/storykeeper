@@ -61,18 +61,28 @@ public sealed class OpenAiCompatibleAdventureDraftGenerator(
 
         using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", config.ApiKey.Trim());
-        request.Content = new StringContent(JsonSerializer.Serialize(new
+        var requestBody = new Dictionary<string, object?>
         {
-            model = config.Model.Trim(),
-            temperature = 0.7,
-            max_tokens = 3500,
-            response_format = new { type = "text" },
-            messages = new[]
+            ["model"] = config.Model.Trim(),
+            ["max_tokens"] = 3500,
+            ["messages"] = new[]
             {
                 new { role = "system", content = SystemPrompt },
                 new { role = "user", content = JsonSerializer.Serialize(input, ProviderJsonOptions) }
             }
-        }, ProviderJsonOptions), Encoding.UTF8, "application/json");
+        };
+        if (OpenAiCompatibleProviderDiagnostics.ShouldIncludeResponseFormat(endpoint))
+        {
+            requestBody["response_format"] = new { type = "text" };
+        }
+
+        if (OpenAiCompatibleProviderDiagnostics.ShouldIncludeTemperature(endpoint, config.Temperature))
+        {
+            requestBody["temperature"] = config.Temperature;
+        }
+
+        request.Content = new StringContent(JsonSerializer.Serialize(requestBody, ProviderJsonOptions),
+            Encoding.UTF8, "application/json");
 
         HttpResponseMessage response;
         try
@@ -92,7 +102,13 @@ public sealed class OpenAiCompatibleAdventureDraftGenerator(
         {
             if (!response.IsSuccessStatusCode)
             {
-                logger.LogWarning("Adventure draft generation provider returned HTTP {StatusCode}.", response.StatusCode);
+                var diagnostic = await OpenAiCompatibleProviderDiagnostics.ReadAsync(
+                    response, config.ApiKey, cancellationToken);
+                logger.LogWarning(
+                    "Adventure draft generation provider returned HTTP {StatusCode}. Provider error: {ProviderError}. Request ID: {RequestId}.",
+                    response.StatusCode,
+                    diagnostic.Message,
+                    diagnostic.RequestId);
                 throw new AdventureDraftGenerationException(502, "The AI service could not generate an adventure.");
             }
 

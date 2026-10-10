@@ -41,6 +41,7 @@ stack:
 | `STORYKEEPER_AI_BASE_URL` | Optional | HTTPS OpenAI-compatible API base URL |
 | `STORYKEEPER_AI_MODEL` | Optional | Model name for campaign generation and narration |
 | `STORYKEEPER_AI_API_KEY` | Optional secret | Server-only provider credential; never add it to web build variables |
+| `STORYKEEPER_AI_TEMPERATURE` | Optional | Sampling temperature for compatible providers; omitted for Anthropic |
 | `STORYKEEPER_AI_TIMEOUT_SECONDS` | Optional | AI request timeout; defaults to 60 seconds |
 
 Ensure public DNS is configured and inbound TCP ports 80 and 443 are reachable

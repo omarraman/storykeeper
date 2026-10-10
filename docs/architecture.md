@@ -122,10 +122,23 @@ Campaign draft generation runs only on the API server through
 Completions client. `Storykeeper__Ai__BaseUrl`, `Storykeeper__Ai__Model`, and
 `Storykeeper__Ai__ApiKey` configure that client; the API key is never serialized
 to browser responses. The URL is restricted to HTTPS except loopback
-development endpoints. Generation requests use JSON-object mode, strict
-typed deserialization, and server-side structural and safety validation.
+development endpoints. Generation requests use text mode, strict typed
+deserialization, and server-side structural and safety validation.
 Invalid output is not persisted or displayed. A parent must approve a valid,
 editable draft before activation.
+
+Campaign drafts, adventure plans, and live story turns all retain the
+OpenAI-compatible `/chat/completions` integration, including when pointed at
+Anthropic's compatible endpoint. An optional server temperature is omitted
+when unset and for Anthropic hosts; it remains available to LM Studio. Although
+Anthropic documents `response_format` as ignored, the configured compatible
+endpoint returned HTTP 400 for this integration's text hint and required
+`json_schema`. Because prompts already request JSON and the API validates it
+strictly, `response_format` is omitted for Anthropic and remains a text-mode
+hint for compatible local providers. Anthropic describes this layer as primarily for
+testing and model comparison, so this integration does not claim full provider
+compatibility. Provider diagnostics log only a bounded, sanitized provider
+message and request ID when available, never credentials or request bodies.
 
 Draft activation is performed by server-side logic in one database
 transaction. It creates a new isolated campaign with generated settings,

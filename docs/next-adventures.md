@@ -54,6 +54,13 @@ contradictions; parent review is required before activation. Provider failures
 or invalid output do not replace an existing valid draft. The provider key
 remains server-side.
 
+Campaign drafts, adventure plans, and live story turns share the same
+OpenAI-compatible `/chat/completions` request configuration. The optional
+temperature is omitted when unset and omitted for Anthropic API hosts; it may
+be configured for LM Studio. Provider error logs use only a bounded,
+sanitized message and request ID when available, never the request body or API
+key.
+
 Activated quest plans are included in the campaign-scoped context for live
 Storykeeper turns. A later episode can be generated after session wrap-up,
 using the refreshed facts, summaries, and quest history.

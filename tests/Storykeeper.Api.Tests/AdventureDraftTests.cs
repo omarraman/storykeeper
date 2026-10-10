@@ -213,9 +213,10 @@ public sealed class AdventureDraftTests
             client,
             Options.Create(new StorykeeperAiOptions
             {
-                BaseUrl = "https://example.test/v1",
+                BaseUrl = "https://api.anthropic.com/v1",
                 Model = "family-safe-model",
-                ApiKey = "server-only-test-key"
+                ApiKey = "server-only-test-key",
+                Temperature = 0.7
             }),
             NullLogger<OpenAiCompatibleAdventureDraftGenerator>.Instance);
 
@@ -225,10 +226,10 @@ public sealed class AdventureDraftTests
 
         Assert.Equal(expected.Title, generated.Title);
         Assert.Equal(AdventureArcType.Standalone, generated.ArcType);
-        Assert.Equal("https://example.test/v1/chat/completions", handler.RequestUri!.AbsoluteUri);
+        Assert.Equal("https://api.anthropic.com/v1/chat/completions", handler.RequestUri!.AbsoluteUri);
         using var requestDocument = JsonDocument.Parse(handler.RequestBody!);
-        Assert.Equal("text",
-            requestDocument.RootElement.GetProperty("response_format").GetProperty("type").GetString());
+        Assert.False(requestDocument.RootElement.TryGetProperty("temperature", out _));
+        Assert.False(requestDocument.RootElement.TryGetProperty("response_format", out _));
         Assert.StartsWith("Bearer ", handler.Authorization);
     }
 

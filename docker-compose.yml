@@ -10,6 +10,7 @@ services:
       Storykeeper__Ai__BaseUrl: ${STORYKEEPER_AI_BASE_URL:-}
       Storykeeper__Ai__Model: ${STORYKEEPER_AI_MODEL:-}
       Storykeeper__Ai__ApiKey: ${STORYKEEPER_AI_API_KEY:-}
+      Storykeeper__Ai__Temperature: ${STORYKEEPER_AI_TEMPERATURE:-}
       Storykeeper__Ai__TimeoutSeconds: ${STORYKEEPER_AI_TIMEOUT_SECONDS:-60}
       Storykeeper__Ai__RecentTurnLimit: ${STORYKEEPER_AI_RECENT_TURN_LIMIT:-8}
       Storykeeper__Ai__RecentTurnCharacterBudget: ${STORYKEEPER_AI_RECENT_TURN_CHARACTER_BUDGET:-12000}

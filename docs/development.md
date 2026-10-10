@@ -32,18 +32,23 @@ server and must not be placed in web configuration.
 Campaign generation is optional. Configure the API process with
 `Storykeeper__Ai__BaseUrl`, `Storykeeper__Ai__Model`, and
 `Storykeeper__Ai__ApiKey` to use an OpenAI-compatible Chat Completions service.
-The base URL should include any API prefix such as `/v1`. `Storykeeper__Ai__TimeoutSeconds`
-is optional and defaults to 60; valid values are 10-180. Non-loopback
-endpoints must use HTTPS. Store the API key in a server environment or secret
-manager, never in Vite variables or browser storage.
+The base URL should include any API prefix such as `/v1`. The optional
+`Storykeeper__Ai__Temperature` setting is omitted from requests when unset and
+is ignored for `api.anthropic.com` endpoints because current Claude models
+require temperature to be omitted. It can be set for LM Studio and other
+OpenAI-compatible providers. `Storykeeper__Ai__TimeoutSeconds` is optional and
+defaults to 60; valid values are 10-180. Non-loopback endpoints must use HTTPS.
+Store the API key in a server environment or secret manager, never in Vite
+variables or browser storage.
 
 For LM Studio's local server, use a base URL such as
 `http://localhost:1234/v1` and the exact model ID shown by its `/v1/models`
 endpoint. The API requests text output and parses and validates the expected
 JSON shape server-side, which supports compatible servers that reject the
-`json_object` response format. LM Studio may accept a placeholder API key such
-as `local-dev` when authentication is disabled; the API still requires a
-non-empty key setting.
+`json_object` response format. Set `STORYKEEPER_AI_TEMPERATURE` if a sampling
+temperature is desired. LM Studio may accept a placeholder API key such as
+`local-dev` when authentication is disabled; the API still requires a non-empty
+key setting.
 
 Active-session narrative history is configurable on the API server with
 `Storykeeper__Ai__RecentTurnLimit` (default `8`, valid range 1-50) and
@@ -69,9 +74,10 @@ excluded from Git. See [Text-to-speech](text-to-speech.md) for exact provider
 payloads and the campaign-scoped audio API.
 
 For Docker Compose, set `STORYKEEPER_AI_BASE_URL`, `STORYKEEPER_AI_MODEL`,
-`STORYKEEPER_AI_API_KEY`, and optionally `STORYKEEPER_AI_TIMEOUT_SECONDS` in
-the untracked `.env` file. Generation remains unavailable if the provider
-settings are blank; no key is required to run the rest of the application.
+`STORYKEEPER_AI_API_KEY`, and optionally `STORYKEEPER_AI_TEMPERATURE` and
+`STORYKEEPER_AI_TIMEOUT_SECONDS` in the untracked `.env` file. Generation
+remains unavailable if the provider settings are blank; no key is required to
+run the rest of the application.
 
 Configure `Storykeeper__ParentPin` on the API server (or
 `STORYKEEPER_PARENT_PIN` in Docker Compose) to enable PIN-gated parent
